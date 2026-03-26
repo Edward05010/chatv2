@@ -18,7 +18,7 @@ const GroupSettingsModal = ({ show, onClose, group, onGroupUpdated, currentUserI
       } else {
         try {
           const token = localStorage.getItem('token');
-          const response = await axios.get('http://localhost:5000/api/profile', {
+          const response = await axios.get('https://chatv2-i91j.onrender.com/api/profile', {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           setCurrentUser(response.data._id);
@@ -65,7 +65,7 @@ const GroupSettingsModal = ({ show, onClose, group, onGroupUpdated, currentUserI
       formData.append('groupPicture', file);
       
       const response = await axios.post(
-        `http://localhost:5000/api/groups/${group._id}/picture`,
+        `https://chatv2-i91j.onrender.com/api/groups/${group._id}/picture`,
         formData,
         {
           headers: {
@@ -98,7 +98,7 @@ const GroupSettingsModal = ({ show, onClose, group, onGroupUpdated, currentUserI
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        `http://localhost:5000/api/groups/${group._id}/members`,
+        `https://chatv2-i91j.onrender.com/api/groups/${group._id}/members`,
         { userId: friendId },
         {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -118,7 +118,7 @@ const GroupSettingsModal = ({ show, onClose, group, onGroupUpdated, currentUserI
     try {
       const token = localStorage.getItem('token');
       const response = await axios.delete(
-        `http://localhost:5000/api/groups/${group._id}/members/${memberId}`,
+        `https://chatv2-i91j.onrender.com/api/groups/${group._id}/members/${memberId}`,
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }
@@ -136,7 +136,7 @@ const GroupSettingsModal = ({ show, onClose, group, onGroupUpdated, currentUserI
     try {
       const token = localStorage.getItem('token');
       await axios.delete(
-        `http://localhost:5000/api/groups/${group._id}`,
+        `https://chatv2-i91j.onrender.com/api/groups/${group._id}`,
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }
@@ -154,7 +154,7 @@ const GroupSettingsModal = ({ show, onClose, group, onGroupUpdated, currentUserI
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        `http://localhost:5000/api/groups/${group._id}/leave`,
+        `https://chatv2-i91j.onrender.com/api/groups/${group._id}/leave`,
         {},
         {
           headers: { 'Authorization': `Bearer ${token}` }

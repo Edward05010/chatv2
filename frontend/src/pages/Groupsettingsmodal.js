@@ -25,7 +25,7 @@ const GroupSettingsModal = ({ show, onClose, group, onGroupUpdated, currentUserI
     if (!groupName.trim()) return;
     setSaving(true);
     try {
-      const res = await axios.put(`http://localhost:5000/api/groups/${group._id}`, { name: groupName });
+      const res = await axios.put(`https://chatv2-i91j.onrender.com/api/groups/${group._id}`, { name: groupName });
       onGroupUpdated(res.data);
     } catch (e) { alert('Error updating group name'); }
     finally { setSaving(false); }
@@ -33,7 +33,7 @@ const GroupSettingsModal = ({ show, onClose, group, onGroupUpdated, currentUserI
 
   const handleAddMember = async (userId) => {
     try {
-      const res = await axios.post(`http://localhost:5000/api/groups/${group._id}/members`, { userId });
+      const res = await axios.post(`https://chatv2-i91j.onrender.com/api/groups/${group._id}/members`, { userId });
       onGroupUpdated(res.data);
       setAddSearch('');
     } catch (e) { alert(e.response?.data?.error || 'Error adding member'); }
@@ -42,7 +42,7 @@ const GroupSettingsModal = ({ show, onClose, group, onGroupUpdated, currentUserI
   const handleRemoveMember = async (userId) => {
     if (!window.confirm('Remove this member from the group?')) return;
     try {
-      const res = await axios.delete(`http://localhost:5000/api/groups/${group._id}/members/${userId}`);
+      const res = await axios.delete(`https://chatv2-i91j.onrender.com/api/groups/${group._id}/members/${userId}`);
       onGroupUpdated(res.data);
     } catch (e) { alert(e.response?.data?.error || 'Error removing member'); }
   };

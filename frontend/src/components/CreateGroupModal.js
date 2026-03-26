@@ -26,7 +26,7 @@ const CreateGroupModal = ({ show, onClose, friends, onGroupCreated }) => {
     }
 
     try {
-      const response = await axios.post('http://localhost:5000/api/groups/create', {
+      const response = await axios.post('https://chatv2-i91j.onrender.com/api/groups/create', {
         name: groupName,
         description: groupDescription,
         members: selectedMembers

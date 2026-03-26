@@ -45,12 +45,12 @@ const FocusMode = () => {
         // Only save the delta (minutes not yet saved via pauses)
         const minutesToSave = minutesCompleted - minutesAccumulated;
         if (minutesToSave >= 1) {
-          await axios.post('http://localhost:5000/api/study-session', {
+          await axios.post('https://chatv2-i91j.onrender.com/api/study-session', {
             minutes: minutesToSave,
             date: new Date()
           }, { headers: { 'Authorization': `Bearer ${token}` } });
         }
-        await axios.post('http://localhost:5000/api/notifications', {
+        await axios.post('https://chatv2-i91j.onrender.com/api/notifications', {
           text: `Great job! You completed a ${minutesCompleted} minute focus session`,
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
         }, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -70,11 +70,11 @@ const FocusMode = () => {
       if (newMinutes >= 1 && sessionType === 'focus') {
         try {
           const token = localStorage.getItem('token');
-          await axios.post('http://localhost:5000/api/study-session', {
+          await axios.post('https://chatv2-i91j.onrender.com/api/study-session', {
             minutes: newMinutes,
             date: new Date()
           }, { headers: { 'Authorization': `Bearer ${token}` } });
-          await axios.post('http://localhost:5000/api/notifications', {
+          await axios.post('https://chatv2-i91j.onrender.com/api/notifications', {
             text: `You studied for ${totalElapsedMinutes} minute${totalElapsedMinutes > 1 ? 's' : ''} so far`,
             time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
           }, { headers: { 'Authorization': `Bearer ${token}` } });

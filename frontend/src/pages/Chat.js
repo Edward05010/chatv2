@@ -50,7 +50,7 @@ const Chat = () => {
   useEffect(() => {
     if (!token) { navigate('/login'); return; }
 
-    socketRef.current = io('http://localhost:5000');
+    socketRef.current = io('https://chatv2-i91j.onrender.com');
     socketRef.current.emit('authenticate', token);
 
     socketRef.current.on('receive_message', (message) => {
@@ -90,18 +90,18 @@ const Chat = () => {
   }, [messages]);
 
   const loadFriends = async () => {
-    try { const r = await axios.get('http://localhost:5000/api/users/friends'); setFriends(r.data); }
+    try { const r = await axios.get('https://chatv2-i91j.onrender.com/api/users/friends'); setFriends(r.data); }
     catch (e) { console.error(e); }
   };
 
   const loadGroups = async () => {
-    try { const r = await axios.get('http://localhost:5000/api/groups'); setGroups(r.data); }
+    try { const r = await axios.get('https://chatv2-i91j.onrender.com/api/groups'); setGroups(r.data); }
     catch (e) { console.error(e); }
   };
 
   const loadMessages = async (friendId) => {
     try {
-      const r = await axios.get(`http://localhost:5000/api/messages/${friendId}`);
+      const r = await axios.get(`https://chatv2-i91j.onrender.com/api/messages/${friendId}`);
       setMessages(r.data);
       const map = {};
       r.data.forEach(m => { if (m.reactions) map[m._id] = m.reactions; });
@@ -111,7 +111,7 @@ const Chat = () => {
 
   const loadGroupMessages = async (groupId) => {
     try {
-      const r = await axios.get(`http://localhost:5000/api/groups/${groupId}/messages`);
+      const r = await axios.get(`https://chatv2-i91j.onrender.com/api/groups/${groupId}/messages`);
       setMessages(r.data);
       const map = {};
       r.data.forEach(m => { if (m.reactions) map[m._id] = m.reactions; });
@@ -195,14 +195,14 @@ const Chat = () => {
     setSearchQuery(query);
     if (query.length < 2) { setSearchResults([]); return; }
     try {
-      const r = await axios.get(`http://localhost:5000/api/users/search?query=${query}`);
+      const r = await axios.get(`https://chatv2-i91j.onrender.com/api/users/search?query=${query}`);
       setSearchResults(r.data);
     } catch (e) { console.error(e); }
   };
 
   const handleAddFriend = async (userId) => {
     try {
-      await axios.post(`http://localhost:5000/api/users/add-friend/${userId}`);
+      await axios.post(`https://chatv2-i91j.onrender.com/api/users/add-friend/${userId}`);
       setSearchQuery(''); setSearchResults([]); setShowSearch(false); loadFriends();
     } catch (e) { alert(e.response?.data?.error || 'Error adding friend'); }
   };
@@ -226,7 +226,7 @@ const Chat = () => {
     const formData = new FormData();
     formData.append('file', selectedFile);
     try {
-      const up = await axios.post('http://localhost:5000/api/messages/upload', formData, {
+      const up = await axios.post('https://chatv2-i91j.onrender.com/api/messages/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       const msgData = { content: selectedFile.name, fileUrl: up.data.fileUrl, fileType: up.data.fileType, fileName: up.data.fileName };

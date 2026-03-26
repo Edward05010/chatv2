@@ -529,7 +529,7 @@ const Profile = () => {
 
   const loadProfile = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/profile');
+      const res = await axios.get('https://chatv2-i91j.onrender.com/api/profile');
       setEmail(res.data.email);
       setProfilePicture(res.data.profilePicture);
     } catch (e) { console.error(e); }
@@ -538,7 +538,7 @@ const Profile = () => {
   const loadAchievements = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/achievements', {
+      const res = await axios.get('https://chatv2-i91j.onrender.com/api/achievements', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setEarnedMilestones(res.data.earned || []);
@@ -562,7 +562,7 @@ const Profile = () => {
     const formData = new FormData();
     formData.append('profilePicture', selectedFile);
     try {
-      const res = await axios.post('http://localhost:5000/api/profile/picture', formData, {
+      const res = await axios.post('https://chatv2-i91j.onrender.com/api/profile/picture', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setProfilePicture(res.data.profilePicture);
@@ -577,7 +577,7 @@ const Profile = () => {
   const handleUpdateEmail = async (e) => {
     e.preventDefault(); setLoading(true);
     try {
-      await axios.put('http://localhost:5000/api/profile', { email });
+      await axios.put('https://chatv2-i91j.onrender.com/api/profile', { email });
       showMessage('Email updated successfully!', 'success');
     } catch (e) {
       showMessage(e.response?.data?.error || 'Error updating email', 'error');

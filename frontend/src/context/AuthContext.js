@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
         // Fetch fresh user data including profile picture
         try {
           axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
-          const response = await axios.get('http://localhost:5000/api/profile');
+          const response = await axios.get('https://chatv2-i91j.onrender.com/api/profile');
           const freshUser = {
             id: response.data._id,
             username: response.data.username,

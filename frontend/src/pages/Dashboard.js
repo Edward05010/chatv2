@@ -106,7 +106,7 @@ const Dashboard = () => {
     loadStudyData();
     loadNotifications();
     const token = localStorage.getItem('token');
-    socketRef.current = io('http://localhost:5000');
+    socketRef.current = io('https://chatv2-i91j.onrender.com');
     socketRef.current.emit('authenticate', token);
     socketRef.current.on('new_notification', (notification) => {
       setNotifications(prev => [notification, ...prev].slice(0, 10));
@@ -119,7 +119,7 @@ const Dashboard = () => {
   const loadTodos = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/todos', {
+      const response = await axios.get('https://chatv2-i91j.onrender.com/api/todos', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setTodos(response.data);
@@ -129,7 +129,7 @@ const Dashboard = () => {
   const loadStudyData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5000/api/study-data?timeframe=${timeFrame}`, {
+      const response = await axios.get(`https://chatv2-i91j.onrender.com/api/study-data?timeframe=${timeFrame}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setStudyData(response.data);
@@ -146,7 +146,7 @@ const Dashboard = () => {
   const loadNotifications = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/notifications', {
+      const response = await axios.get('https://chatv2-i91j.onrender.com/api/notifications', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setNotifications(response.data);
@@ -158,7 +158,7 @@ const Dashboard = () => {
     if (!newTodo.trim()) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/api/todos', { text: newTodo }, {
+      const response = await axios.post('https://chatv2-i91j.onrender.com/api/todos', { text: newTodo }, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setTodos([...todos, response.data]);
@@ -170,7 +170,7 @@ const Dashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const todo = todos.find(t => t._id === id);
-      const response = await axios.put(`http://localhost:5000/api/todos/${id}`,
+      const response = await axios.put(`https://chatv2-i91j.onrender.com/api/todos/${id}`,
         { completed: !todo.completed },
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
@@ -181,7 +181,7 @@ const Dashboard = () => {
   const deleteTodo = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/todos/${id}`, {
+      await axios.delete(`https://chatv2-i91j.onrender.com/api/todos/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setTodos(todos.filter(t => t._id !== id));
