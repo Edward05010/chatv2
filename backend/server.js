@@ -15,6 +15,10 @@ const upload = require('./upload');
 const app = express();
 const server = http.createServer(app);
 
+const fs = require('fs');
+const path = require('path');
+if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
+
 // ✅ FIX 1: Allow all origins so Render frontend can connect via Socket.IO
 const io = socketIo(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
