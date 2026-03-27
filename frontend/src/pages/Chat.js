@@ -39,6 +39,24 @@ const Chat = () => {
   const messageRefs = useRef({});
   const contextMenuRef = useRef(null);
 
+  // ✅ FIX: Refs to track current selected chat inside socket callbacks
+  const selectedFriendRef = useRef(null);
+  const selectedGroupRef = useRef(null);
+  const chatTypeRef = useRef('dm');
+  const userRef = useRef(null);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    selectedFriendRef.current = selectedFriend;
+    selectedGroupRef.current = selectedGroup;
+    chatTypeRef.current = chatType;
+  }, [selectedFriend, selectedGroup, chatType]);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  // Close context menu on outside click
   useEffect(() => {
     const handleClick = (e) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
@@ -49,6 +67,7 @@ const Chat = () => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  // ✅ FIX: Socket setup runs ONCE only (no selectedFriend/selectedGroup in deps)
   useEffect(() => {
     if (!token) { navigate('/login'); return; }
 
@@ -56,13 +75,18 @@ const Chat = () => {
     socketRef.current.emit('authenticate', token);
 
     socketRef.current.on('receive_message', (message) => {
+      const sf = selectedFriendRef.current;
+      const sg = selectedGroupRef.current;
+      const ct = chatTypeRef.current;
+      const u = userRef.current;
+
       setMessages(prev => {
-        if (chatType === 'group' && selectedGroup && message.group === selectedGroup._id)
+        if (ct === 'group' && sg && message.group === sg._id)
           return [...prev, message];
-        if (chatType === 'dm' && selectedFriend) {
+        if (ct === 'dm' && sf) {
           const ok =
-            (message.sender._id === selectedFriend._id && message.receiver._id === user?.id) ||
-            (message.sender._id === user?.id && message.receiver._id === selectedFriend._id);
+            (message.sender._id === sf._id && message.receiver._id === u?.id) ||
+            (message.sender._id === u?.id && message.receiver._id === sf._id);
           if (ok) return [...prev, message];
         }
         return prev;
@@ -85,7 +109,16 @@ const Chat = () => {
     loadGroups();
 
     return () => { if (socketRef.current) socketRef.current.disconnect(); };
-  }, [token, navigate, selectedFriend, selectedGroup, user, chatType]);
+  }, [token]); // ✅ Only depends on token
+
+  // ✅ FIX: Load messages whenever selected friend/group changes
+  useEffect(() => {
+    if (selectedFriend) loadMessages(selectedFriend._id);
+  }, [selectedFriend]);
+
+  useEffect(() => {
+    if (selectedGroup) loadGroupMessages(selectedGroup._id);
+  }, [selectedGroup]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -124,13 +157,13 @@ const Chat = () => {
   const handleFriendSelect = (friend) => {
     setSelectedFriend(friend); setSelectedGroup(null);
     setChatType('dm'); setReplyTo(null); setContextMenu(null);
-    loadMessages(friend._id);
+    setMessages([]); // ✅ Clear messages immediately for clean UI
   };
 
   const handleGroupSelect = (group) => {
     setSelectedGroup(group); setSelectedFriend(null);
     setChatType('group'); setReplyTo(null); setContextMenu(null);
-    loadGroupMessages(group._id);
+    setMessages([]); // ✅ Clear messages immediately for clean UI
   };
 
   // ========== MINDNEST AI ==========
@@ -372,7 +405,6 @@ const Chat = () => {
 
   const sidebarItems = buildMixedSidebar();
 
-  // MindNest typing bubble
   const MindNestTypingBubble = () => (
     <div style={{ ...s.messageWrapper, alignItems: 'flex-start' }}>
       <div style={{ ...s.messageRowInner, flexDirection: 'row' }}>
@@ -429,7 +461,6 @@ const Chat = () => {
           </button>
         </div>
 
-        {/* MindNest hint */}
         <div style={{ padding: '8px 16px', background: '#050d1a', borderBottom: '1px solid #0d1f35', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 14 }}>🤖</span>
           <span style={{ fontSize: 11, color: '#3a7abf' }}>Type <strong style={{ color: '#4a8fd4' }}>@MindNest</strong> to ask AI</span>
