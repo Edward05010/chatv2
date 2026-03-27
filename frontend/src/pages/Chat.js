@@ -8,6 +8,7 @@ import GroupChatView from '../components/GroupChatView';
 import GroupSettingsModal from '../components/GroupSettingsModal';
 
 const EMOJI_LIST = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+const API = 'https://chatv2-i91j.onrender.com';
 
 const Chat = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -28,6 +29,7 @@ const Chat = () => {
   const [replyTo, setReplyTo] = useState(null);
   const [reactions, setReactions] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
+  const [mindNestTyping, setMindNestTyping] = useState(false);
 
   const { user, token, logout } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -50,7 +52,7 @@ const Chat = () => {
   useEffect(() => {
     if (!token) { navigate('/login'); return; }
 
-    socketRef.current = io('https://chatv2-i91j.onrender.com');
+    socketRef.current = io(API);
     socketRef.current.emit('authenticate', token);
 
     socketRef.current.on('receive_message', (message) => {
@@ -87,21 +89,21 @@ const Chat = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, mindNestTyping]);
 
   const loadFriends = async () => {
-    try { const r = await axios.get('https://chatv2-i91j.onrender.com/api/users/friends'); setFriends(r.data); }
+    try { const r = await axios.get(`${API}/api/users/friends`); setFriends(r.data); }
     catch (e) { console.error(e); }
   };
 
   const loadGroups = async () => {
-    try { const r = await axios.get('https://chatv2-i91j.onrender.com/api/groups'); setGroups(r.data); }
+    try { const r = await axios.get(`${API}/api/groups`); setGroups(r.data); }
     catch (e) { console.error(e); }
   };
 
   const loadMessages = async (friendId) => {
     try {
-      const r = await axios.get(`https://chatv2-i91j.onrender.com/api/messages/${friendId}`);
+      const r = await axios.get(`${API}/api/messages/${friendId}`);
       setMessages(r.data);
       const map = {};
       r.data.forEach(m => { if (m.reactions) map[m._id] = m.reactions; });
@@ -111,7 +113,7 @@ const Chat = () => {
 
   const loadGroupMessages = async (groupId) => {
     try {
-      const r = await axios.get(`https://chatv2-i91j.onrender.com/api/groups/${groupId}/messages`);
+      const r = await axios.get(`${API}/api/groups/${groupId}/messages`);
       setMessages(r.data);
       const map = {};
       r.data.forEach(m => { if (m.reactions) map[m._id] = m.reactions; });
@@ -131,7 +133,44 @@ const Chat = () => {
     loadGroupMessages(group._id);
   };
 
-  const handleSendMessage = (e) => {
+  // ========== MINDNEST AI ==========
+  const triggerMindNest = async (msgText, currentMessages) => {
+    if (!msgText.toLowerCase().includes('@mindnest')) return;
+    try {
+      setMindNestTyping(true);
+      const context = currentMessages.slice(-10).map(m => ({
+        role: m.sender?.username === user?.username ? 'user' : 'assistant',
+        content: m.content || ''
+      })).filter(m => m.content);
+
+      const res = await axios.post(`${API}/api/ai/chat`,
+        { message: msgText, context },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const aiMessage = {
+        _id: 'mindnest_' + Date.now(),
+        sender: { username: 'MindNest AI', _id: 'mindnest' },
+        content: res.data.reply,
+        createdAt: new Date().toISOString(),
+        isMindNest: true
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (e) {
+      console.error('MindNest error:', e);
+      setMessages(prev => [...prev, {
+        _id: 'mindnest_err_' + Date.now(),
+        sender: { username: 'MindNest AI', _id: 'mindnest' },
+        content: '⚠️ Sorry, I had trouble responding. Please try again!',
+        createdAt: new Date().toISOString(),
+        isMindNest: true
+      }]);
+    } finally {
+      setMindNestTyping(false);
+    }
+  };
+
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedFriend) return;
     socketRef.current.emit('send_message', {
@@ -139,12 +178,15 @@ const Chat = () => {
       content: newMessage,
       replyTo: replyTo?._id || null
     });
+    const msgText = newMessage;
+    const currentMessages = [...messages];
     setNewMessage('');
     setReplyTo(null);
     loadFriends();
+    await triggerMindNest(msgText, currentMessages);
   };
 
-  const handleSendGroupMessage = (e) => {
+  const handleSendGroupMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedGroup) return;
     socketRef.current.emit('send_message', {
@@ -152,9 +194,12 @@ const Chat = () => {
       content: newMessage,
       replyTo: replyTo?._id || null
     });
+    const msgText = newMessage;
+    const currentMessages = [...messages];
     setNewMessage('');
     setReplyTo(null);
     loadGroups();
+    await triggerMindNest(msgText, currentMessages);
   };
 
   const handleContextMenu = (e, msg) => {
@@ -195,14 +240,14 @@ const Chat = () => {
     setSearchQuery(query);
     if (query.length < 2) { setSearchResults([]); return; }
     try {
-      const r = await axios.get(`https://chatv2-i91j.onrender.com/api/users/search?query=${query}`);
+      const r = await axios.get(`${API}/api/users/search?query=${query}`);
       setSearchResults(r.data);
     } catch (e) { console.error(e); }
   };
 
   const handleAddFriend = async (userId) => {
     try {
-      await axios.post(`https://chatv2-i91j.onrender.com/api/users/add-friend/${userId}`);
+      await axios.post(`${API}/api/users/add-friend/${userId}`);
       setSearchQuery(''); setSearchResults([]); setShowSearch(false); loadFriends();
     } catch (e) { alert(e.response?.data?.error || 'Error adding friend'); }
   };
@@ -226,7 +271,7 @@ const Chat = () => {
     const formData = new FormData();
     formData.append('file', selectedFile);
     try {
-      const up = await axios.post('https://chatv2-i91j.onrender.com/api/messages/upload', formData, {
+      const up = await axios.post(`${API}/api/messages/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       const msgData = { content: selectedFile.name, fileUrl: up.data.fileUrl, fileType: up.data.fileType, fileName: up.data.fileName };
@@ -259,7 +304,6 @@ const Chat = () => {
     return items.sort((a, b) => b.ts - a.ts);
   };
 
-  // Renders quoted reply block inside the bubble — WhatsApp/Discord style
   const renderReplyQuote = (msg, isOwn, allMessages) => {
     if (!msg.replyTo) return null;
     const isPopulated = typeof msg.replyTo === 'object' && msg.replyTo !== null;
@@ -271,29 +315,12 @@ const Chat = () => {
       : orig?.content
         ? orig.content.length > 60 ? orig.content.substring(0, 60) + '…' : orig.content
         : 'Original message';
-
     return (
-      <div
-        onClick={(e) => { e.stopPropagation(); refId && scrollToMessage(refId); }}
-        style={{
-          borderLeft: `3px solid ${isOwn ? 'rgba(0,0,0,0.3)' : '#555'}`,
-          backgroundColor: isOwn ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)',
-          borderRadius: '4px',
-          padding: '5px 8px',
-          marginBottom: '6px',
-          cursor: 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '2px',
-        }}
-        title="Jump to original message"
-      >
-        <span style={{ fontSize: '11px', fontWeight: '700', color: isOwn ? 'rgba(0,0,0,0.5)' : '#aaa' }}>
-          {senderName}
-        </span>
-        <span style={{ fontSize: '12px', color: isOwn ? 'rgba(0,0,0,0.4)' : '#777', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {previewText}
-        </span>
+      <div onClick={(e) => { e.stopPropagation(); refId && scrollToMessage(refId); }}
+        style={{ borderLeft: `3px solid ${isOwn ? 'rgba(0,0,0,0.3)' : '#555'}`, backgroundColor: isOwn ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)', borderRadius: '4px', padding: '5px 8px', marginBottom: '6px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' }}
+        title="Jump to original message">
+        <span style={{ fontSize: '11px', fontWeight: '700', color: isOwn ? 'rgba(0,0,0,0.5)' : '#aaa' }}>{senderName}</span>
+        <span style={{ fontSize: '12px', color: isOwn ? 'rgba(0,0,0,0.4)' : '#777', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{previewText}</span>
       </div>
     );
   };
@@ -305,14 +332,8 @@ const Chat = () => {
       <div style={s.reactionsRow}>
         {Object.entries(r).map(([emoji, users]) =>
           users.length > 0 ? (
-            <button key={emoji}
-              onClick={() => handleReact(msg._id, emoji)}
-              style={{
-                ...s.reactionBadge,
-                backgroundColor: users.includes(user?.id) ? '#2d2d2d' : '#141414',
-                border: `1px solid ${users.includes(user?.id) ? '#555' : '#222'}`
-              }}
-            >
+            <button key={emoji} onClick={() => handleReact(msg._id, emoji)}
+              style={{ ...s.reactionBadge, backgroundColor: users.includes(user?.id) ? '#2d2d2d' : '#141414', border: `1px solid ${users.includes(user?.id) ? '#555' : '#222'}` }}>
               {emoji} <span style={s.reactionCount}>{users.length}</span>
             </button>
           ) : null
@@ -324,13 +345,11 @@ const Chat = () => {
   const renderMessageContent = (msg, isOwn) => {
     if (msg.fileUrl) {
       if (msg.fileType === 'image') return (
-        <img src={msg.fileUrl} alt={msg.fileName || 'Image'} style={s.messageImage}
-          onClick={() => window.open(msg.fileUrl, '_blank')} />
+        <img src={msg.fileUrl} alt={msg.fileName || 'Image'} style={s.messageImage} onClick={() => window.open(msg.fileUrl, '_blank')} />
       );
       if (msg.fileType === 'video') return <video src={msg.fileUrl} controls style={s.messageVideo} />;
       return (
-        <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer"
-          style={{ ...s.fileLink, color: isOwn ? '#000' : '#fff' }}>
+        <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer" style={{ ...s.fileLink, color: isOwn ? '#000' : '#fff' }}>
           <FileIcon /><span>{msg.fileName || msg.content}</span>
         </a>
       );
@@ -353,38 +372,44 @@ const Chat = () => {
 
   const sidebarItems = buildMixedSidebar();
 
+  // MindNest typing bubble
+  const MindNestTypingBubble = () => (
+    <div style={{ ...s.messageWrapper, alignItems: 'flex-start' }}>
+      <div style={{ ...s.messageRowInner, flexDirection: 'row' }}>
+        <div style={s.messageAvatar}>
+          <div style={{ ...s.messageAvatarPlaceholder, backgroundColor: '#0f1f3d', fontSize: '14px' }}>🤖</div>
+        </div>
+        <div style={s.bubbleCol}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#4a8fd4', marginBottom: '4px' }}>MindNest AI</div>
+          <div style={{ ...s.messageBubble, backgroundColor: '#0a1628', border: '1px solid #1a3a6a', borderRadius: '4px 18px 18px 18px', color: '#4a8fd4' }}>
+            <span style={{ letterSpacing: '4px', fontSize: '16px' }}>●●●</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={s.container} onClick={() => setContextMenu(null)}>
 
       {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          style={{ ...s.contextMenu, top: contextMenu.y, left: contextMenu.x }}
-          onClick={e => e.stopPropagation()}
-        >
+        <div ref={contextMenuRef} style={{ ...s.contextMenu, top: contextMenu.y, left: contextMenu.x }} onClick={e => e.stopPropagation()}>
           <div style={s.contextEmojiRow}>
             {EMOJI_LIST.map(emoji => {
               const reacted = reactions[contextMenu.message._id]?.[emoji]?.includes(user?.id);
               return (
                 <button key={emoji} onClick={() => handleReact(contextMenu.message._id, emoji)} title={emoji}
-                  style={{
-                    ...s.contextEmojiBtn,
-                    transform: reacted ? 'scale(1.3)' : 'scale(1)',
-                    backgroundColor: reacted ? '#2a2a2a' : 'transparent',
-                    outline: reacted ? '1px solid #555' : 'none', outlineOffset: '1px'
-                  }}>
+                  style={{ ...s.contextEmojiBtn, transform: reacted ? 'scale(1.3)' : 'scale(1)', backgroundColor: reacted ? '#2a2a2a' : 'transparent', outline: reacted ? '1px solid #555' : 'none', outlineOffset: '1px' }}>
                   {emoji}
                 </button>
               );
             })}
           </div>
           <div style={s.contextDivider} />
-          <button
-            style={s.contextMenuItem}
+          <button style={s.contextMenuItem}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = '#1a1a1a'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-            onClick={() => { setReplyTo(contextMenu.message); setContextMenu(null); }}
-          >
+            onClick={() => { setReplyTo(contextMenu.message); setContextMenu(null); }}>
             <ReplyIcon /><span>Reply</span>
           </button>
         </div>
@@ -403,6 +428,13 @@ const Chat = () => {
             <UsersIconLg /> Create Group
           </button>
         </div>
+
+        {/* MindNest hint */}
+        <div style={{ padding: '8px 16px', background: '#050d1a', borderBottom: '1px solid #0d1f35', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 14 }}>🤖</span>
+          <span style={{ fontSize: 11, color: '#3a7abf' }}>Type <strong style={{ color: '#4a8fd4' }}>@MindNest</strong> to ask AI</span>
+        </div>
+
         <div style={s.friendsList}>
           {sidebarItems.map(item => {
             const isDm = item.type === 'dm';
@@ -421,8 +453,7 @@ const Chat = () => {
                 onClick={() => isDm ? handleFriendSelect(data) : handleGroupSelect(data)}
                 style={{ ...s.friendItem, backgroundColor: isActive ? '#1a1a1a' : 'transparent' }}
                 onMouseEnter={e => { if (!isActive) e.currentTarget.style.backgroundColor = '#0f0f0f'; }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = isActive ? '#1a1a1a' : 'transparent'; }}
-              >
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = isActive ? '#1a1a1a' : 'transparent'; }}>
                 <div style={s.friendAvatarWrap}>
                   {pic ? <img src={pic} alt={name} style={s.avatarImg} /> : <div style={s.avatarPlaceholder}>{name[0].toUpperCase()}</div>}
                   {!isDm && <div style={s.groupBadge}><UsersIcon /></div>}
@@ -478,6 +509,7 @@ const Chat = () => {
             messageRefs={messageRefs}
             currentUserId={user?.id}
             scrollToMessage={scrollToMessage}
+            mindNestTyping={mindNestTyping}
           />
         ) : selectedFriend ? (
           <>
@@ -498,31 +530,37 @@ const Chat = () => {
 
             <div style={s.messagesArea}>
               {messages.map((msg, index) => {
-                const isOwn = msg.sender.username === user?.username;
-                const hasReactions = reactions[msg._id] && Object.values(reactions[msg._id]).some(a => a.length > 0);
+                const isMindNest = msg.isMindNest === true;
+                const isOwn = !isMindNest && msg.sender.username === user?.username;
+                const hasReactions = !isMindNest && reactions[msg._id] && Object.values(reactions[msg._id]).some(a => a.length > 0);
                 return (
                   <div key={index}
                     ref={el => { if (msg._id) messageRefs.current[msg._id] = el; }}
-                    style={{ ...s.messageWrapper, alignItems: isOwn ? 'flex-end' : 'flex-start' }}
-                    onContextMenu={e => handleContextMenu(e, msg)}
-                  >
-                    <div style={{ ...s.messageRowInner, flexDirection: isOwn ? 'row-reverse' : 'row' }}>
+                    style={{ ...s.messageWrapper, alignItems: isMindNest ? 'flex-start' : isOwn ? 'flex-end' : 'flex-start' }}
+                    onContextMenu={e => !isMindNest && handleContextMenu(e, msg)}>
+                    <div style={{ ...s.messageRowInner, flexDirection: isOwn && !isMindNest ? 'row-reverse' : 'row' }}>
                       <div style={s.messageAvatar}>
-                        {isOwn
-                          ? user?.profilePicture ? <img src={user.profilePicture} alt="" style={s.messageAvatarImg} /> : <div style={s.messageAvatarPlaceholder}>{user?.username?.[0]?.toUpperCase()}</div>
-                          : selectedFriend.profilePicture ? <img src={selectedFriend.profilePicture} alt="" style={s.messageAvatarImg} /> : <div style={s.messageAvatarPlaceholder}>{selectedFriend.username[0].toUpperCase()}</div>
+                        {isMindNest
+                          ? <div style={{ ...s.messageAvatarPlaceholder, backgroundColor: '#0f1f3d', fontSize: '14px' }}>🤖</div>
+                          : isOwn
+                            ? user?.profilePicture ? <img src={user.profilePicture} alt="" style={s.messageAvatarImg} /> : <div style={s.messageAvatarPlaceholder}>{user?.username?.[0]?.toUpperCase()}</div>
+                            : selectedFriend.profilePicture ? <img src={selectedFriend.profilePicture} alt="" style={s.messageAvatarImg} /> : <div style={s.messageAvatarPlaceholder}>{selectedFriend.username[0].toUpperCase()}</div>
                         }
                       </div>
                       <div style={s.bubbleCol}>
+                        {isMindNest && (
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#4a8fd4', marginBottom: '4px', letterSpacing: '0.3px' }}>
+                            🤖 MindNest AI
+                          </div>
+                        )}
                         <div style={{
                           ...s.messageBubble,
-                          backgroundColor: isOwn ? '#ffffff' : '#1a1a1a',
-                          color: isOwn ? '#000000' : '#ffffff',
-                          borderRadius: isOwn ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                          backgroundColor: isMindNest ? '#0a1628' : isOwn ? '#ffffff' : '#1a1a1a',
+                          color: isMindNest ? '#a8d4f5' : isOwn ? '#000000' : '#ffffff',
+                          borderRadius: isMindNest ? '4px 18px 18px 18px' : isOwn ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                          border: isMindNest ? '1px solid #1a3a6a' : 'none',
                         }}>
-                          {/* Reply quote at top of bubble */}
                           {msg.replyTo && renderReplyQuote(msg, isOwn, messages)}
-                          {/* Message content */}
                           {renderMessageContent(msg, isOwn)}
                         </div>
                         {hasReactions && renderReactions(msg)}
@@ -531,6 +569,8 @@ const Chat = () => {
                   </div>
                 );
               })}
+
+              {mindNestTyping && <MindNestTypingBubble />}
               <div ref={messagesEndRef} />
             </div>
 
@@ -551,7 +591,6 @@ const Chat = () => {
               </div>
             )}
 
-            {/* Reply banner above input */}
             {replyTo && (
               <div style={s.replyBanner}>
                 <div style={s.replyBannerLeft}>
@@ -572,7 +611,7 @@ const Chat = () => {
                 <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip" />
                 <button type="button" onClick={() => fileInputRef.current?.click()} style={s.attachButton}><PaperclipIcon /></button>
                 <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)}
-                  placeholder={`Message ${selectedFriend.username}`} style={s.messageInput} />
+                  placeholder={`Message ${selectedFriend.username} — or type @MindNest to ask AI`} style={s.messageInput} />
                 <button type="submit" style={s.sendButton} disabled={!newMessage.trim()}><SendIcon /></button>
               </form>
             </div>
@@ -669,13 +708,7 @@ const s = {
   messageAvatarImg: { width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' },
   messageAvatarPlaceholder: { width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#ffffff', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600' },
   bubbleCol: { display: 'flex', flexDirection: 'column', maxWidth: 'calc(100% - 40px)', minWidth: 0 },
-  messageBubble: {
-    fontSize: '15px', lineHeight: '1.5',
-    wordBreak: 'break-word', overflowWrap: 'anywhere',
-    display: 'flex', flexDirection: 'column',  // flex column so reply quote stacks above text
-    padding: '10px 14px',
-    maxWidth: '480px',
-  },
+  messageBubble: { fontSize: '15px', lineHeight: '1.5', wordBreak: 'break-word', overflowWrap: 'anywhere', display: 'flex', flexDirection: 'column', padding: '10px 14px', maxWidth: '480px' },
   messageText: { display: 'block' },
   messageImage: { maxWidth: '300px', maxHeight: '300px', borderRadius: '12px', cursor: 'pointer', display: 'block' },
   messageVideo: { maxWidth: '300px', maxHeight: '300px', borderRadius: '12px', display: 'block' },

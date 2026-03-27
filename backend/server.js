@@ -541,6 +541,65 @@ app.put('/api/notifications/:id/read', auth, async (req, res) => {
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
+// ========== MINDNEST AI ==========
+
+const https = require('https');
+
+const callMindNest = (messages) => {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'claude-opus-4-6',
+      max_tokens: 1024,
+      system: `You are MindNest AI, a friendly and smart assistant built into a student chat app called MindNest. 
+You help students with their studies, answer questions, explain concepts, help with assignments, and provide support. 
+Keep responses concise and helpful. Use markdown sparingly. Be warm and encouraging.`,
+      messages
+    });
+
+    const options = {
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          resolve(parsed.content?.[0]?.text || 'Sorry, I could not generate a response.');
+        } catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+};
+
+app.post('/api/ai/chat', auth, async (req, res) => {
+  try {
+    const { message, context } = req.body;
+    // context is array of {role, content} for conversation history
+    const messages = [
+      ...(context || []),
+      { role: 'user', content: message }
+    ];
+    const reply = await callMindNest(messages);
+    res.json({ reply });
+  } catch (error) {
+    console.error('MindNest AI error:', error);
+    res.status(500).json({ error: 'MindNest AI failed to respond' });
+  }
+});
+
 // ========== SOCKET.IO ==========
 
 const userSockets = new Map();
