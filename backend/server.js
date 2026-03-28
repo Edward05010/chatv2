@@ -535,47 +535,6 @@ app.put('/api/notifications/:id/read', auth, async (req, res) => {
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-// ========== MINDNEST AI ==========
-
-const callMindNest = async (messages) => {
-  const lastMessage = messages[messages.length - 1].content;
-  const history = messages.slice(0, -1).map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }]
-  }));
-
-  const body = JSON.stringify({
-    contents: [...history, { role: 'user', parts: [{ text: lastMessage }] }],
-    systemInstruction: {
-      parts: [{ text: `You are MindNest AI, a friendly and smart assistant built into a student chat app called MindNest. You help students with their studies, answer questions, explain concepts, help with assignments, and provide support. Keep responses concise and helpful. Be warm and encouraging.` }]
-    }
-  });
-
-  // ✅ FIXED: Updated to gemini-2.0-flash
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
-  );
-  const data = await response.json();
-  console.log('MindNest raw response:', JSON.stringify(data));
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
-};
-
-app.post('/api/ai/chat', auth, async (req, res) => {
-  try {
-    const { message, context } = req.body;
-    const messages = [
-      ...(context || []),
-      { role: 'user', content: message }
-    ];
-    const reply = await callMindNest(messages);
-    res.json({ reply });
-  } catch (error) {
-    console.error('MindNest AI error:', error);
-    res.status(500).json({ error: 'MindNest AI failed to respond' });
-  }
-});
-
 // ========== SOCKET.IO ==========
 
 const userSockets = new Map();
