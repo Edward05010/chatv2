@@ -19,7 +19,6 @@ const fs = require('fs');
 const path = require('path');
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
-// ✅ FIX 1: Allow all origins so Render frontend can connect via Socket.IO
 const io = socketIo(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
@@ -536,9 +535,8 @@ app.put('/api/notifications/:id/read', auth, async (req, res) => {
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-// ========== MINDNEST AI (Gemini) ==========
+// ========== MINDNEST AI ==========
 
-// ✅ Switched to Google Gemini API (free tier)
 const callMindNest = async (messages) => {
   const lastMessage = messages[messages.length - 1].content;
   const history = messages.slice(0, -1).map(m => ({
@@ -553,8 +551,9 @@ const callMindNest = async (messages) => {
     }
   });
 
+  // ✅ FIXED: Updated to gemini-2.0-flash
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
   );
   const data = await response.json();
