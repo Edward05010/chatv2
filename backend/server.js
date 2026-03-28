@@ -15,17 +15,12 @@ const upload = require('./upload');
 const app = express();
 const server = http.createServer(app);
 
-const fs = require('fs');
-const path = require('path');
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
-
 const io = socketIo(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ Connected to MongoDB'))
@@ -195,7 +190,8 @@ app.get('/api/profile', auth, async (req, res) => {
 app.post('/api/profile/picture', auth, upload.single('profilePicture'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const profilePictureUrl = `${process.env.SERVER_URL}/uploads/${req.file.filename}`;
+    // Cloudinary returns the URL directly in req.file.path
+    const profilePictureUrl = req.file.path;
     await User.findByIdAndUpdate(req.userId, { profilePicture: profilePictureUrl });
     res.json({ profilePicture: profilePictureUrl });
   } catch (error) { res.status(400).json({ error: error.message }); }
@@ -231,7 +227,8 @@ app.get('/api/messages/:userId', auth, async (req, res) => {
 app.post('/api/messages/upload', auth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    const fileUrl = `${process.env.SERVER_URL}/uploads/${req.file.filename}`;
+    // Cloudinary returns the URL directly in req.file.path
+    const fileUrl = req.file.path;
     const fileType = req.file.mimetype.startsWith('image/') ? 'image'
                    : req.file.mimetype.startsWith('video/') ? 'video' : 'document';
     res.json({ fileUrl, fileType, fileName: req.file.originalname, fileSize: req.file.size });
@@ -293,7 +290,8 @@ app.post('/api/groups/:groupId/picture', auth, upload.single('groupPicture'), as
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ error: 'Group not found' });
     if (group.admin.toString() !== req.userId.toString()) return res.status(403).json({ error: 'Only admin can update group picture' });
-    const groupPictureUrl = `${process.env.SERVER_URL}/uploads/${req.file.filename}`;
+    // Cloudinary returns the URL directly in req.file.path
+    const groupPictureUrl = req.file.path;
     group.groupPicture = groupPictureUrl;
     await group.save();
     await group.populate('members admin', 'username profilePicture');
