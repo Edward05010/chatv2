@@ -196,7 +196,6 @@ app.get('/api/profile', auth, async (req, res) => {
 app.post('/api/profile/picture', auth, upload.single('profilePicture'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    // ✅ FIX 2: Use SERVER_URL env var instead of hardcoded localhost
     const profilePictureUrl = `${process.env.SERVER_URL}/uploads/${req.file.filename}`;
     await User.findByIdAndUpdate(req.userId, { profilePicture: profilePictureUrl });
     res.json({ profilePicture: profilePictureUrl });
@@ -233,7 +232,6 @@ app.get('/api/messages/:userId', auth, async (req, res) => {
 app.post('/api/messages/upload', auth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    // ✅ FIX 3: Use SERVER_URL env var instead of hardcoded localhost
     const fileUrl = `${process.env.SERVER_URL}/uploads/${req.file.filename}`;
     const fileType = req.file.mimetype.startsWith('image/') ? 'image'
                    : req.file.mimetype.startsWith('video/') ? 'video' : 'document';
@@ -296,7 +294,6 @@ app.post('/api/groups/:groupId/picture', auth, upload.single('groupPicture'), as
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ error: 'Group not found' });
     if (group.admin.toString() !== req.userId.toString()) return res.status(403).json({ error: 'Only admin can update group picture' });
-    // ✅ FIX 4: Use SERVER_URL env var instead of hardcoded localhost
     const groupPictureUrl = `${process.env.SERVER_URL}/uploads/${req.file.filename}`;
     group.groupPicture = groupPictureUrl;
     await group.save();
@@ -539,48 +536,30 @@ app.put('/api/notifications/:id/read', auth, async (req, res) => {
   } catch (error) { res.status(400).json({ error: error.message }); }
 });
 
-// ========== MINDNEST AI ==========
+// ========== MINDNEST AI (Gemini) ==========
 
-const https = require('https');
+// ✅ Switched to Google Gemini API (free tier)
+const callMindNest = async (messages) => {
+  const lastMessage = messages[messages.length - 1].content;
+  const history = messages.slice(0, -1).map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }]
+  }));
 
-const callMindNest = (messages) => {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({
-      model: 'claude-opus-4-5',
-      max_tokens: 1024,
-      system: `You are MindNest AI, a friendly and smart assistant built into a student chat app called MindNest.
-You help students with their studies, answer questions, explain concepts, help with assignments, and provide support.
-Keep responses concise and helpful. Use markdown sparingly. Be warm and encouraging.`,
-      messages
-    });
-
-    const options = {
-      hostname: 'api.anthropic.com',
-      path: '/v1/messages',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'Content-Length': Buffer.byteLength(body)
-      }
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-      try {
-        const parsed = JSON.parse(data);
-        console.log('MindNest raw response:', JSON.stringify(parsed));
-        resolve(parsed.content?.[0]?.text || 'Sorry, I could not generate a response.');
-      } catch (e) { reject(e); }
-    });
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
+  const body = JSON.stringify({
+    contents: [...history, { role: 'user', parts: [{ text: lastMessage }] }],
+    systemInstruction: {
+      parts: [{ text: `You are MindNest AI, a friendly and smart assistant built into a student chat app called MindNest. You help students with their studies, answer questions, explain concepts, help with assignments, and provide support. Keep responses concise and helpful. Be warm and encouraging.` }]
+    }
   });
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+  );
+  const data = await response.json();
+  console.log('MindNest raw response:', JSON.stringify(data));
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not generate a response.';
 };
 
 app.post('/api/ai/chat', auth, async (req, res) => {
