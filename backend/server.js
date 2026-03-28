@@ -546,7 +546,7 @@ const https = require('https');
 const callMindNest = (messages) => {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-opus-4-5',
       max_tokens: 1024,
       system: `You are MindNest AI, a friendly and smart assistant built into a student chat app called MindNest.
 You help students with their studies, answer questions, explain concepts, help with assignments, and provide support.
@@ -570,11 +570,12 @@ Keep responses concise and helpful. Use markdown sparingly. Be warm and encourag
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          resolve(parsed.content?.[0]?.text || 'Sorry, I could not generate a response.');
-        } catch (e) { reject(e); }
-      });
+      try {
+        const parsed = JSON.parse(data);
+        console.log('MindNest raw response:', JSON.stringify(parsed));
+        resolve(parsed.content?.[0]?.text || 'Sorry, I could not generate a response.');
+      } catch (e) { reject(e); }
+    });
     });
     req.on('error', reject);
     req.write(body);
