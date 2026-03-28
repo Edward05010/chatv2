@@ -37,7 +37,6 @@ const Chat = () => {
   const [replyTo, setReplyTo] = useState(null);
   const [reactions, setReactions] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
-  // Mobile: true = show sidebar list, false = show chat
   const [showSidebar, setShowSidebar] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
@@ -48,16 +47,20 @@ const Chat = () => {
   const fileInputRef = useRef(null);
   const messageRefs = useRef({});
   const contextMenuRef = useRef(null);
-  const selectedFriendRef = useRef(null);
-  const selectedGroupRef = useRef(null);
-  const chatTypeRef = useRef('dm');
-  const userRef = useRef(null);
   const longPressTimer = useRef(null);
 
+  // Always-current refs so socket callbacks never go stale
+  const selectedFriendRef = useRef(null);
+  const selectedGroupRef  = useRef(null);
+  const chatTypeRef       = useRef('dm');
+  const userRef           = useRef(null);
+  const messagesRef       = useRef([]);
+
   useEffect(() => { selectedFriendRef.current = selectedFriend; }, [selectedFriend]);
-  useEffect(() => { selectedGroupRef.current = selectedGroup; }, [selectedGroup]);
-  useEffect(() => { chatTypeRef.current = chatType; }, [chatType]);
-  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { selectedGroupRef.current  = selectedGroup;  }, [selectedGroup]);
+  useEffect(() => { chatTypeRef.current       = chatType;       }, [chatType]);
+  useEffect(() => { userRef.current           = user;           }, [user]);
+  useEffect(() => { messagesRef.current       = messages;       }, [messages]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -69,6 +72,7 @@ const Chat = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Close context menu on outside click
   useEffect(() => {
     const handleClick = (e) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) setContextMenu(null);
@@ -77,45 +81,70 @@ const Chat = () => {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  // ── Socket setup (runs once on mount) ─────────────────────────────────────
   useEffect(() => {
     if (!token) { navigate('/login'); return; }
-    socketRef.current = io(API);
-    socketRef.current.emit('authenticate', token);
 
-    socketRef.current.on('receive_message', (message) => {
+    const socket = io(API, {
+      auth: { token },
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+    });
+    socketRef.current = socket;
+    socket.emit('authenticate', token);
+
+    socket.on('connect', () => {
+      // Re-authenticate after reconnect
+      socket.emit('authenticate', token);
+    });
+
+    socket.on('receive_message', (message) => {
       const sf = selectedFriendRef.current;
       const sg = selectedGroupRef.current;
       const ct = chatTypeRef.current;
-      const u = userRef.current;
+      const u  = userRef.current;
+
       setMessages(prev => {
-        if (ct === 'group' && sg && message.group === sg._id) return [...prev, message];
+        if (ct === 'group' && sg && message.group === sg._id) {
+          return [...prev, message];
+        }
         if (ct === 'dm' && sf) {
-          const ok = (message.sender._id === sf._id && message.receiver._id === u?.id) ||
-                     (message.sender._id === u?.id && message.receiver._id === sf._id);
+          const ok =
+            (message.sender._id === sf._id  && message.receiver._id === u?.id) ||
+            (message.sender._id === u?.id   && message.receiver._id === sf._id);
           if (ok) return [...prev, message];
         }
         return prev;
       });
-      loadFriends(); loadGroups();
+
+      // Refresh sidebar previews
+      loadFriends();
+      loadGroups();
     });
 
-    socketRef.current.on('message_sent', (message) => {
+    socket.on('message_sent', (message) => {
       setMessages(prev => [...prev, message]);
-      loadFriends(); loadGroups();
+      loadFriends();
+      loadGroups();
     });
 
-    socketRef.current.on('reaction_updated', ({ messageId, reactions: r }) => {
+    socket.on('reaction_updated', ({ messageId, reactions: r }) => {
       setReactions(prev => ({ ...prev, [messageId]: r }));
     });
 
-    loadFriends(); loadGroups();
-    return () => { if (socketRef.current) socketRef.current.disconnect(); };
-  }, [token]);
+    loadFriends();
+    loadGroups();
 
+    return () => { socket.disconnect(); };
+  }, [token]); // eslint-disable-line
+
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // ── Data loaders ──────────────────────────────────────────────────────────
   const loadFriends = async () => {
     try { const r = await axios.get(`${API}/api/users/friends`); setFriends(r.data); } catch (e) { console.error(e); }
   };
@@ -141,20 +170,19 @@ const Chat = () => {
     } catch (e) { console.error(e); }
   };
 
+  // ── Selection handlers ────────────────────────────────────────────────────
   const handleFriendSelect = (friend) => {
     setSelectedFriend(friend); setSelectedGroup(null);
     setChatType('dm'); setReplyTo(null); setContextMenu(null); setMessages([]);
     loadMessages(friend._id);
     if (isMobile) setShowSidebar(false);
   };
-
   const handleGroupSelect = (group) => {
     setSelectedGroup(group); setSelectedFriend(null);
     setChatType('group'); setReplyTo(null); setContextMenu(null); setMessages([]);
     loadGroupMessages(group._id);
     if (isMobile) setShowSidebar(false);
   };
-
   const handleBack = () => {
     setShowSidebar(true);
     setSelectedFriend(null);
@@ -162,6 +190,7 @@ const Chat = () => {
     setMessages([]);
   };
 
+  // ── Send ──────────────────────────────────────────────────────────────────
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedFriend) return;
@@ -172,7 +201,6 @@ const Chat = () => {
     });
     setNewMessage(''); setReplyTo(null); loadFriends();
   };
-
   const handleSendGroupMessage = (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedGroup) return;
@@ -184,27 +212,32 @@ const Chat = () => {
     setNewMessage(''); setReplyTo(null); loadGroups();
   };
 
+  // ── Context menu (desktop right-click + mobile long-press) ────────────────
   const handleContextMenu = (e, msg) => {
     e.preventDefault(); e.stopPropagation();
     const x = e.clientX + 240 > window.innerWidth ? e.clientX - 240 : e.clientX;
-    const y = e.clientY + 200 > window.innerHeight ? e.clientY - 200 : e.clientY;
-    setContextMenu({ x, y, message: msg });
+    const y = e.clientY + 220 > window.innerHeight ? e.clientY - 220 : e.clientY;
+    setContextMenu({ x, y, message: msg, centered: false });
   };
 
+  // Mobile: long-press opens centered menu
   const handleTouchStart = (msg) => {
     longPressTimer.current = setTimeout(() => {
       setContextMenu({
-        x: window.innerWidth / 2 - 120,
-        y: window.innerHeight / 2 - 100,
+        x: 0, y: 0,
         message: msg,
-        centered: true
+        centered: true,
       });
     }, 500);
   };
   const handleTouchEnd = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
   };
 
+  // ── Reactions ─────────────────────────────────────────────────────────────
   const handleReact = (messageId, reactionId) => {
     socketRef.current.emit('react_message', { messageId, emoji: reactionId });
     setContextMenu(null);
@@ -231,13 +264,13 @@ const Chat = () => {
     setTimeout(() => { el.style.backgroundColor = ''; }, 1300);
   };
 
+  // ── Search ────────────────────────────────────────────────────────────────
   const handleSearch = async (query) => {
     setSearchQuery(query);
     if (query.length < 2) { setSearchResults([]); return; }
     try { const r = await axios.get(`${API}/api/users/search?query=${query}`); setSearchResults(r.data); }
     catch (e) { console.error(e); }
   };
-
   const handleAddFriend = async (userId) => {
     try {
       await axios.post(`${API}/api/users/add-friend/${userId}`);
@@ -245,6 +278,7 @@ const Chat = () => {
     } catch (e) { alert(e.response?.data?.error || 'Error adding friend'); }
   };
 
+  // ── File ──────────────────────────────────────────────────────────────────
   const handleFileSelect = (e) => {
     const file = e.target.files[0]; if (!file) return;
     setSelectedFile(file);
@@ -256,7 +290,6 @@ const Chat = () => {
       setFilePreview(URL.createObjectURL(file));
     } else setFilePreview(null);
   };
-
   const handleSendFile = async () => {
     if (!selectedFile || (!selectedFriend && !selectedGroup)) return;
     setUploading(true);
@@ -273,8 +306,9 @@ const Chat = () => {
     } catch (e) { alert('Error uploading file'); }
     finally { setUploading(false); }
   };
-
   const cancelFileUpload = () => { setSelectedFile(null); setFilePreview(null); };
+
+  // ── Group helpers ─────────────────────────────────────────────────────────
   const handleGroupCreated = (g) => setGroups(prev => [g, ...prev]);
   const handleGroupUpdated = (updated) => {
     setGroups(prev => prev.map(g => g._id === updated._id ? updated : g));
@@ -288,13 +322,16 @@ const Chat = () => {
     return items.sort((a, b) => b.ts - a.ts);
   };
 
+  // ── Render helpers ────────────────────────────────────────────────────────
   const renderReplyQuote = (msg, isOwn) => {
     if (!msg.replyTo) return null;
     const isPopulated = typeof msg.replyTo === 'object' && msg.replyTo !== null;
     const refId = isPopulated ? msg.replyTo._id : msg.replyTo;
     const orig = isPopulated ? msg.replyTo : messages.find(m => m._id === refId);
     const senderName = orig?.sender?.username || 'Unknown';
-    const previewText = orig?.fileUrl ? '📎 Media' : orig?.content ? (orig.content.length > 50 ? orig.content.substring(0, 50) + '…' : orig.content) : 'Original message';
+    const previewText = orig?.fileUrl ? '📎 Media' : orig?.content
+      ? (orig.content.length > 50 ? orig.content.substring(0, 50) + '…' : orig.content)
+      : 'Original message';
     return (
       <div onClick={(e) => { e.stopPropagation(); refId && scrollToMessage(refId); }}
         style={{ borderLeft: `3px solid ${isOwn ? 'rgba(0,0,0,0.3)' : '#555'}`, backgroundColor: isOwn ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)', borderRadius: '4px', padding: '5px 8px', marginBottom: '6px', cursor: 'pointer' }}>
@@ -334,42 +371,42 @@ const Chat = () => {
     return <span style={s.messageText}>{msg.content}</span>;
   };
 
-  // Icons
-  const SearchIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>);
-  const UserPlusIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>);
-  const UsersIcon = () => (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>);
-  const UsersIconLg = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>);
-  const SettingsIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"/></svg>);
-  const LogoutIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>);
-  const SendIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>);
-  const CloseIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>);
-  const MessageIcon = () => (<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>);
+  // ── Icons ─────────────────────────────────────────────────────────────────
+  const SearchIcon    = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>);
+  const UserPlusIcon  = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>);
+  const UsersIcon     = () => (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>);
+  const UsersIconLg   = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>);
+  const SettingsIcon  = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m9-9h-6m-6 0H3"/></svg>);
+  const LogoutIcon    = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>);
+  const SendIcon      = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>);
+  const CloseIcon     = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>);
+  const MessageIcon   = () => (<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>);
   const PaperclipIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>);
-  const FileIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>);
-  const ReplyIcon = () => (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>);
-  const BackIcon = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>);
-  const EditIcon = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>);
+  const FileIcon      = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>);
+  const ReplyIcon     = () => (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>);
+  const BackIcon      = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>);
+  const EditIcon      = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>);
 
   const sidebarItems = buildMixedSidebar();
-
-  // On mobile: sidebar and chat are full-screen, toggled
-  // On desktop: side by side
   const showSidebarPanel = !isMobile || showSidebar;
-  const showChatPanel = !isMobile || !showSidebar;
+  const showChatPanel    = !isMobile || !showSidebar;
 
   return (
     <div style={s.container} onClick={() => setContextMenu(null)}>
 
-      {/* Context Menu */}
+      {/* ── Context Menu (right-click desktop / long-press mobile) ── */}
       {contextMenu && (
-        <div ref={contextMenuRef}
+        <div
+          ref={contextMenuRef}
           style={{
             ...s.contextMenu,
-            top: contextMenu.centered ? '50%' : contextMenu.y,
-            left: contextMenu.centered ? '50%' : contextMenu.x,
-            transform: contextMenu.centered ? 'translate(-50%, -50%)' : 'none',
+            ...(contextMenu.centered
+              ? { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+              : { top: contextMenu.y, left: contextMenu.x }
+            ),
           }}
-          onClick={e => e.stopPropagation()}>
+          onClick={e => e.stopPropagation()}
+        >
           <div style={s.contextReactionRow}>
             {REACTIONS.map(({ id, svg, label, color }) => {
               const reacted = reactions[contextMenu.message._id]?.[id]?.includes(user?.id);
@@ -391,23 +428,16 @@ const Chat = () => {
         </div>
       )}
 
-      {/* ── SIDEBAR PANEL ── */}
+      {/* ── SIDEBAR ── */}
       {showSidebarPanel && (
         <div style={{ ...s.sidebar, width: isMobile ? '100%' : '300px' }}>
-          {/* Header */}
           <div style={s.sidebarTop}>
             <span style={s.sidebarTitle}>Messages</span>
-            <button onClick={() => setShowSearch(true)} style={s.iconBtnSm} title="Search"><SearchIcon /></button>
+            <button onClick={() => setShowSearch(true)} style={s.iconBtnSm}><SearchIcon /></button>
           </div>
-
-          {/* Create Group */}
           <div style={s.sidebarAction}>
-            <button onClick={() => setShowCreateGroup(true)} style={s.createGroupButton}>
-              <UsersIconLg /> New Group
-            </button>
+            <button onClick={() => setShowCreateGroup(true)} style={s.createGroupButton}><UsersIconLg /> New Group</button>
           </div>
-
-          {/* Chat list */}
           <div style={s.friendsList}>
             {sidebarItems.length === 0 && (
               <div style={s.emptyList}>
@@ -442,8 +472,6 @@ const Chat = () => {
               );
             })}
           </div>
-
-          {/* User footer — only on desktop */}
           {!isMobile && (
             <div style={s.userFooter}>
               <div style={s.userFooterLeft}>
@@ -456,8 +484,8 @@ const Chat = () => {
                 </div>
               </div>
               <div style={s.userFooterActions}>
-                <button onClick={() => navigate('/profile')} style={s.iconBtn} title="Settings"><SettingsIcon /></button>
-                <button onClick={logout} style={s.iconBtn} title="Logout"><LogoutIcon /></button>
+                <button onClick={() => navigate('/profile')} style={s.iconBtn}><SettingsIcon /></button>
+                <button onClick={logout} style={s.iconBtn}><LogoutIcon /></button>
               </div>
             </div>
           )}
@@ -486,12 +514,10 @@ const Chat = () => {
             />
           ) : selectedFriend ? (
             <>
-              {/* Chat Header */}
+              {/* Fixed header */}
               <div style={s.chatHeader}>
                 <div style={s.chatHeaderLeft}>
-                  {isMobile && (
-                    <button onClick={handleBack} style={s.backBtn}><BackIcon /></button>
-                  )}
+                  {isMobile && <button onClick={handleBack} style={s.backBtn}><BackIcon /></button>}
                   <div style={s.chatAvatar}>
                     {selectedFriend.profilePicture
                       ? <img src={selectedFriend.profilePicture} alt="" style={s.chatAvatarImg} />
@@ -505,8 +531,8 @@ const Chat = () => {
                 </div>
               </div>
 
-              {/* Messages */}
-              <div style={s.messagesArea} className="messages-scroll">
+              {/* Scrollable messages — fills remaining space */}
+              <div style={s.messagesArea}>
                 {messages.map((msg, index) => {
                   const isOwn = msg.sender.username === user?.username;
                   const hasReactions = reactions[msg._id] && Object.values(reactions[msg._id]).some(a => a.length > 0);
@@ -539,68 +565,62 @@ const Chat = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* File Preview */}
-              {selectedFile && (
-                <div style={s.filePreviewContainer}>
-                  {filePreview
-                    ? (filePreview.startsWith('data:image') ? <img src={filePreview} alt="Preview" style={s.filePreviewImage} /> : <video src={filePreview} style={s.filePreviewImage} />)
-                    : <div style={s.filePreviewDoc}><FileIcon /><span style={{ fontSize: '13px', color: '#fff' }}>{selectedFile.name}</span></div>
-                  }
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                    <button onClick={cancelFileUpload} style={s.cancelButton}>Cancel</button>
-                    <button onClick={handleSendFile} disabled={uploading} style={s.uploadButton}>{uploading ? 'Sending…' : 'Send'}</button>
-                  </div>
-                </div>
-              )}
-
-              {/* Reply Banner */}
-              {replyTo && (
-                <div style={s.replyBanner}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-                    <ReplyIcon />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#fff' }}>Replying to {replyTo.sender?.username}</div>
-                      <div style={{ fontSize: '12px', color: '#777', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {replyTo.content || '[media]'}
-                      </div>
+              {/* Fixed bottom area */}
+              <div style={s.bottomArea}>
+                {/* File Preview */}
+                {selectedFile && (
+                  <div style={s.filePreviewContainer}>
+                    {filePreview
+                      ? (filePreview.startsWith('data:image') ? <img src={filePreview} alt="Preview" style={s.filePreviewImage} /> : <video src={filePreview} style={s.filePreviewImage} />)
+                      : <div style={s.filePreviewDoc}><FileIcon /><span style={{ fontSize: '13px', color: '#fff' }}>{selectedFile.name}</span></div>
+                    }
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                      <button onClick={cancelFileUpload} style={s.cancelButton}>Cancel</button>
+                      <button onClick={handleSendFile} disabled={uploading} style={s.uploadButton}>{uploading ? 'Sending…' : 'Send'}</button>
                     </div>
                   </div>
-                  <button onClick={() => setReplyTo(null)} style={s.replyBannerClose}><CloseIcon /></button>
-                </div>
-              )}
+                )}
 
-              {/* Input */}
-              <div style={s.messageInputArea}>
-                <form onSubmit={handleSendMessage} style={s.messageForm}>
-                  <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip" />
-                  <button type="button" onClick={() => fileInputRef.current?.click()} style={s.attachButton}><PaperclipIcon /></button>
-                  <input
-                    type="text" value={newMessage}
-                    onChange={e => setNewMessage(e.target.value)}
-                    placeholder={`Message ${selectedFriend.username}…`}
-                    style={s.messageInput}
-                  />
-                  <button type="submit" style={s.sendButton} disabled={!newMessage.trim()}><SendIcon /></button>
-                </form>
+                {/* Reply Banner */}
+                {replyTo && (
+                  <div style={s.replyBanner}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                      <ReplyIcon />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: '#fff' }}>Replying to {replyTo.sender?.username}</div>
+                        <div style={{ fontSize: '12px', color: '#777', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{replyTo.content || '[media]'}</div>
+                      </div>
+                    </div>
+                    <button onClick={() => setReplyTo(null)} style={s.replyBannerClose}><CloseIcon /></button>
+                  </div>
+                )}
+
+                {/* Input */}
+                <div style={s.messageInputArea}>
+                  <form onSubmit={handleSendMessage} style={s.messageForm}>
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip" />
+                    <button type="button" onClick={() => fileInputRef.current?.click()} style={s.attachButton}><PaperclipIcon /></button>
+                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)}
+                      placeholder={`Message ${selectedFriend.username}…`} style={s.messageInput} />
+                    <button type="submit" style={s.sendButton} disabled={!newMessage.trim()}><SendIcon /></button>
+                  </form>
+                </div>
               </div>
             </>
           ) : (
-            // Empty state — only shows on desktop (on mobile sidebar is shown instead)
             !isMobile && (
               <div style={s.noChat}>
                 <MessageIcon />
                 <h2 style={s.noChatTitle}>Your messages</h2>
                 <p style={s.noChatText}>Select a conversation or start a new one</p>
-                <button onClick={() => setShowSearch(true)} style={s.noChatBtn}>
-                  <EditIcon /> New Message
-                </button>
+                <button onClick={() => setShowSearch(true)} style={s.noChatBtn}><EditIcon /> New Message</button>
               </div>
             )
           )}
         </div>
       )}
 
-      {/* Search / Add Friend Modal */}
+      {/* Search Modal */}
       {showSearch && (
         <div style={s.modal} onClick={() => setShowSearch(false)}>
           <div style={{ ...s.modalContent, maxHeight: isMobile ? '85vh' : '80vh', width: isMobile ? '95%' : '480px' }} onClick={e => e.stopPropagation()}>
@@ -641,8 +661,17 @@ const Chat = () => {
   );
 };
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const s = {
-  container: { display: 'flex', height: '100%', backgroundColor: '#000', position: 'relative', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#fff', overflow: 'hidden' },
+  container: {
+    display: 'flex',
+    height: '100%',          // fills MainLayout's flex container
+    backgroundColor: '#000',
+    position: 'relative',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    color: '#fff',
+    overflow: 'hidden',
+  },
 
   // Context menu
   contextMenu: { position: 'fixed', zIndex: 9999, backgroundColor: '#111', border: '1px solid #2a2a2a', borderRadius: '16px', padding: '10px', boxShadow: '0 12px 40px rgba(0,0,0,0.85)', minWidth: '220px' },
@@ -653,11 +682,11 @@ const s = {
 
   // Sidebar
   sidebar: { backgroundColor: '#0a0a0a', borderRight: '1px solid #1a1a1a', display: 'flex', flexDirection: 'column', flexShrink: 0, height: '100%', overflow: 'hidden' },
-  sidebarTop: { padding: '16px 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #1a1a1a' },
+  sidebarTop: { padding: '16px 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #1a1a1a', flexShrink: 0 },
   sidebarTitle: { fontSize: '18px', fontWeight: '700', color: '#fff' },
-  sidebarAction: { padding: '10px 12px', borderBottom: '1px solid #1a1a1a' },
+  sidebarAction: { padding: '10px 12px', borderBottom: '1px solid #1a1a1a', flexShrink: 0 },
   createGroupButton: { width: '100%', padding: '9px', backgroundColor: '#1a1a1a', color: '#fff', border: '1px solid #2a2a2a', borderRadius: '8px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' },
-  friendsList: { flex: 1, overflowY: 'auto', padding: '6px' },
+  friendsList: { flex: 1, overflowY: 'auto', padding: '6px', minHeight: 0 },
   emptyList: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#333' },
   friendItem: { display: 'flex', alignItems: 'center', padding: '10px 12px', borderRadius: '10px', cursor: 'pointer', transition: 'background-color 0.15s', marginBottom: '2px', minHeight: '60px' },
   friendAvatarWrap: { width: '44px', height: '44px', marginRight: '10px', flexShrink: 0, position: 'relative' },
@@ -667,7 +696,7 @@ const s = {
   friendInfo: { flex: 1, overflow: 'hidden' },
   friendName: { fontSize: '14px', fontWeight: '500', color: '#fff', marginBottom: '2px' },
   friendStatus: { fontSize: '12px', color: '#666', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  userFooter: { padding: '12px 16px', borderTop: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#000' },
+  userFooter: { padding: '12px 16px', borderTop: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#000', flexShrink: 0 },
   userFooterLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
   userAvatar: { width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#fff', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', overflow: 'hidden' },
   userAvatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
@@ -678,8 +707,18 @@ const s = {
   iconBtn: { background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   iconBtnSm: { background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
 
-  // Chat
-  chatArea: { flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#000', height: '100%', overflow: 'hidden', minWidth: 0 },
+  // Chat area — KEY: flex column, fixed height, no overflow on self
+  chatArea: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: '#000',
+    height: '100%',
+    overflow: 'hidden',   // prevent the column itself from scrolling
+    minWidth: 0,
+  },
+
+  // Fixed header — never scrolls
   chatHeader: { height: '58px', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', padding: '0 14px', backgroundColor: '#0a0a0a', flexShrink: 0 },
   chatHeaderLeft: { display: 'flex', alignItems: 'center', gap: '8px' },
   backBtn: { background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px 8px 4px 0', display: 'flex', alignItems: 'center', flexShrink: 0 },
@@ -689,8 +728,21 @@ const s = {
   chatHeaderName: { fontSize: '14px', fontWeight: '600', color: '#fff', marginBottom: '1px' },
   chatHeaderStatus: { fontSize: '11px', color: '#666' },
 
-  // Messages
-  messagesArea: { flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px', WebkitOverflowScrolling: 'touch' },
+  // Scrollable messages area — KEY: flex:1 + minHeight:0 + overflowY:auto
+  messagesArea: {
+    flex: 1,
+    minHeight: 0,          // ← critical: allows flex child to shrink below content size
+    overflowY: 'auto',
+    padding: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    WebkitOverflowScrolling: 'touch',
+  },
+
+  // Fixed bottom: file preview + reply banner + input, all in one block
+  bottomArea: { flexShrink: 0 },
+
   messageWrapper: { display: 'flex', flexDirection: 'column', paddingBottom: '2px' },
   messageRowInner: { display: 'flex', alignItems: 'flex-end', gap: '6px', maxWidth: '85%' },
   messageAvatar: { width: '28px', height: '28px', flexShrink: 0 },
@@ -706,31 +758,31 @@ const s = {
   reactionBadge: { display: 'flex', alignItems: 'center', gap: '3px', padding: '2px 7px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.12s' },
   reactionCount: { fontSize: '11px', fontWeight: '600' },
 
-  // Reply banner
-  replyBanner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', backgroundColor: '#0d0d0d', borderTop: '1px solid #1a1a1a', flexShrink: 0, gap: '8px' },
+  replyBanner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', backgroundColor: '#0d0d0d', borderTop: '1px solid #1a1a1a', gap: '8px' },
   replyBannerClose: { background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', flexShrink: 0 },
 
-  // File preview
-  filePreviewContainer: { padding: '10px 14px', borderTop: '1px solid #1a1a1a', backgroundColor: '#0a0a0a', flexShrink: 0 },
+  filePreviewContainer: { padding: '10px 14px', borderTop: '1px solid #1a1a1a', backgroundColor: '#0a0a0a' },
   filePreviewImage: { maxWidth: '120px', maxHeight: '120px', borderRadius: '8px' },
   filePreviewDoc: { display: 'flex', alignItems: 'center', gap: '8px' },
   cancelButton: { padding: '7px 14px', backgroundColor: 'transparent', color: '#fff', border: '1px solid #1a1a1a', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' },
   uploadButton: { padding: '7px 14px', backgroundColor: '#fff', color: '#000', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
 
-  // Input
-  messageInputArea: { padding: '10px 12px', borderTop: '1px solid #1a1a1a', backgroundColor: '#0a0a0a', flexShrink: 0, paddingBottom: 'max(10px, env(safe-area-inset-bottom))' },
+  messageInputArea: {
+    padding: '10px 12px',
+    borderTop: '1px solid #1a1a1a',
+    backgroundColor: '#0a0a0a',
+    paddingBottom: 'max(10px, env(safe-area-inset-bottom))',
+  },
   messageForm: { display: 'flex', gap: '6px', alignItems: 'center' },
   attachButton: { width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'transparent', color: '#666', border: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 },
   messageInput: { flex: 1, padding: '10px 14px', backgroundColor: '#000', border: '1px solid #1a1a1a', borderRadius: '22px', color: '#fff', fontSize: '15px', outline: 'none', minWidth: 0 },
   sendButton: { width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#fff', color: '#000', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 },
 
-  // Empty state
   noChat: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#666', gap: '12px', padding: '20px' },
   noChatTitle: { fontSize: '20px', fontWeight: '600', color: '#fff', margin: 0 },
   noChatText: { fontSize: '14px', color: '#666', margin: 0, textAlign: 'center' },
   noChatBtn: { marginTop: '8px', padding: '10px 20px', backgroundColor: '#fff', color: '#000', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' },
 
-  // Modals
   modal: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' },
   modalContent: { backgroundColor: '#0a0a0a', borderRadius: '16px', display: 'flex', flexDirection: 'column', border: '1px solid #1a1a1a', overflow: 'hidden' },
   modalHeader: { padding: '18px 20px', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
