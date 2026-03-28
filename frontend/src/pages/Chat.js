@@ -7,8 +7,89 @@ import CreateGroupModal from '../components/CreateGroupModal';
 import GroupChatView from '../components/GroupChatView';
 import GroupSettingsModal from '../components/GroupSettingsModal';
 
-const EMOJI_LIST = ['👍', '❤️', '😂', '😮', '😢', '😡'];
 const API = 'https://chatv2-i91j.onrender.com';
+
+// ========== SVG REACTIONS ==========
+export const REACTIONS = [
+  {
+    id: 'like',
+    label: 'Like',
+    color: '#4a90e2',
+    svg: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#4a90e2" stroke="none">
+        <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3m7-10v4a2 2 0 0 1-2 2H9l-2 7v1h12l2-9H14z"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'love',
+    label: 'Love',
+    color: '#e25555',
+    svg: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#e25555" stroke="none">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'laugh',
+    label: 'Haha',
+    color: '#f5a623',
+    svg: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#f5a623" stroke="none">
+        <circle cx="12" cy="12" r="10"/>
+        <path fill="#fff" d="M8 14s1.5 2 4 2 4-2 4-2"/>
+        <circle cx="9" cy="10" r="1.2" fill="#fff"/>
+        <circle cx="15" cy="10" r="1.2" fill="#fff"/>
+        <path fill="#fff" d="M8.5 8.5c.5-1 1.5-1.5 3.5-1s2.5 1 2.5 1" stroke="#fff" strokeWidth="0.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'wow',
+    label: 'Wow',
+    color: '#f5a623',
+    svg: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#f5a623" stroke="none">
+        <circle cx="12" cy="12" r="10"/>
+        <circle cx="9" cy="10" r="1.3" fill="#fff"/>
+        <circle cx="15" cy="10" r="1.3" fill="#fff"/>
+        <ellipse cx="12" cy="15" rx="2.5" ry="3" fill="#fff"/>
+        <path fill="#fff" d="M8 8c1-1.5 6-1.5 8 0" stroke="none"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'cry',
+    label: 'Sad',
+    color: '#4a90e2',
+    svg: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#4a90e2" stroke="none">
+        <circle cx="12" cy="12" r="10"/>
+        <path fill="#fff" d="M8 15s1.5-2 4-2 4 2 4 2" strokeLinecap="round"/>
+        <circle cx="9" cy="10" r="1.2" fill="#fff"/>
+        <circle cx="15" cy="10" r="1.2" fill="#fff"/>
+        <path d="M8.5 13.5 Q9 16 8 17" stroke="#a8d4f5" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
+        <path d="M15.5 13.5 Q15 16 16 17" stroke="#a8d4f5" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'angry',
+    label: 'Angry',
+    color: '#e25555',
+    svg: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#e25555" stroke="none">
+        <circle cx="12" cy="12" r="10"/>
+        <path fill="#fff" d="M8 15s1.5-2 4-2 4 2 4 2"/>
+        <circle cx="9" cy="10.5" r="1.2" fill="#fff"/>
+        <circle cx="15" cy="10.5" r="1.2" fill="#fff"/>
+        <path d="M7 8l3 2" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+        <path d="M17 8l-3 2" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+      </svg>
+    ),
+  },
+];
 
 const Chat = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -29,7 +110,6 @@ const Chat = () => {
   const [replyTo, setReplyTo] = useState(null);
   const [reactions, setReactions] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
-  const [mindNestTyping, setMindNestTyping] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
@@ -44,13 +124,11 @@ const Chat = () => {
   const selectedGroupRef = useRef(null);
   const chatTypeRef = useRef('dm');
   const userRef = useRef(null);
+  const longPressTimer = useRef(null);
 
-  useEffect(() => {
-    selectedFriendRef.current = selectedFriend;
-    selectedGroupRef.current = selectedGroup;
-    chatTypeRef.current = chatType;
-  }, [selectedFriend, selectedGroup, chatType]);
-
+  useEffect(() => { selectedFriendRef.current = selectedFriend; }, [selectedFriend]);
+  useEffect(() => { selectedGroupRef.current = selectedGroup; }, [selectedGroup]);
+  useEffect(() => { chatTypeRef.current = chatType; }, [chatType]);
   useEffect(() => { userRef.current = user; }, [user]);
 
   useEffect(() => {
@@ -109,9 +187,7 @@ const Chat = () => {
     return () => { if (socketRef.current) socketRef.current.disconnect(); };
   }, [token]);
 
-  useEffect(() => { if (selectedFriend) loadMessages(selectedFriend._id); }, [selectedFriend]);
-  useEffect(() => { if (selectedGroup) loadGroupMessages(selectedGroup._id); }, [selectedGroup]);
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, mindNestTyping]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const loadFriends = async () => {
     try { const r = await axios.get(`${API}/api/users/friends`); setFriends(r.data); } catch (e) { console.error(e); }
@@ -141,64 +217,69 @@ const Chat = () => {
   const handleFriendSelect = (friend) => {
     setSelectedFriend(friend); setSelectedGroup(null);
     setChatType('dm'); setReplyTo(null); setContextMenu(null); setMessages([]);
+    loadMessages(friend._id);
     if (isMobile) setShowSidebar(false);
   };
   const handleGroupSelect = (group) => {
     setSelectedGroup(group); setSelectedFriend(null);
     setChatType('group'); setReplyTo(null); setContextMenu(null); setMessages([]);
+    loadGroupMessages(group._id);
     if (isMobile) setShowSidebar(false);
   };
 
-  const triggerMindNest = async (msgText, currentMessages) => {
-    if (!msgText.toLowerCase().includes('@mindnest')) return;
-    try {
-      setMindNestTyping(true);
-      const context = currentMessages.slice(-10).map(m => ({
-        role: m.sender?.username === user?.username ? 'user' : 'assistant',
-        content: m.content || ''
-      })).filter(m => m.content);
-      const res = await axios.post(`${API}/api/ai/chat`, { message: msgText, context }, { headers: { Authorization: `Bearer ${token}` } });
-      setMessages(prev => [...prev, { _id: 'mindnest_' + Date.now(), sender: { username: 'MindNest AI', _id: 'mindnest' }, content: res.data.reply, createdAt: new Date().toISOString(), isMindNest: true }]);
-    } catch (e) {
-      console.error('MindNest error:', e);
-      setMessages(prev => [...prev, { _id: 'mindnest_err_' + Date.now(), sender: { username: 'MindNest AI', _id: 'mindnest' }, content: '⚠️ Sorry, I had trouble responding. Please try again!', createdAt: new Date().toISOString(), isMindNest: true }]);
-    } finally { setMindNestTyping(false); }
-  };
-
-  const handleSendMessage = async (e) => {
+  const handleSendMessage = (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedFriend) return;
-    socketRef.current.emit('send_message', { receiverId: selectedFriend._id, content: newMessage, replyTo: replyTo?._id || null });
-    const msgText = newMessage; const currentMessages = [...messages];
+    socketRef.current.emit('send_message', {
+      receiverId: selectedFriend._id,
+      content: newMessage,
+      replyTo: replyTo?._id || null
+    });
     setNewMessage(''); setReplyTo(null); loadFriends();
-    await triggerMindNest(msgText, currentMessages);
   };
 
-  const handleSendGroupMessage = async (e) => {
+  const handleSendGroupMessage = (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedGroup) return;
-    socketRef.current.emit('send_message', { groupId: selectedGroup._id, content: newMessage, replyTo: replyTo?._id || null });
-    const msgText = newMessage; const currentMessages = [...messages];
+    socketRef.current.emit('send_message', {
+      groupId: selectedGroup._id,
+      content: newMessage,
+      replyTo: replyTo?._id || null
+    });
     setNewMessage(''); setReplyTo(null); loadGroups();
-    await triggerMindNest(msgText, currentMessages);
   };
 
+  // Desktop right-click context menu
   const handleContextMenu = (e, msg) => {
     e.preventDefault(); e.stopPropagation();
-    const x = e.clientX + 220 > window.innerWidth ? e.clientX - 220 : e.clientX;
-    const y = e.clientY + 180 > window.innerHeight ? e.clientY - 180 : e.clientY;
+    const x = e.clientX + 240 > window.innerWidth ? e.clientX - 240 : e.clientX;
+    const y = e.clientY + 200 > window.innerHeight ? e.clientY - 200 : e.clientY;
     setContextMenu({ x, y, message: msg });
   };
 
-  const handleReact = (messageId, emoji) => {
-    socketRef.current.emit('react_message', { messageId, emoji });
+  // Mobile long press
+  const handleTouchStart = (msg) => {
+    longPressTimer.current = setTimeout(() => {
+      setContextMenu({ x: window.innerWidth / 2 - 120, y: window.innerHeight / 2 - 100, message: msg, centered: true });
+    }, 500);
+  };
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+
+  const handleReact = (messageId, reactionId) => {
+    socketRef.current.emit('react_message', { messageId, emoji: reactionId });
     setContextMenu(null);
     setReactions(prev => {
       const cur = { ...(prev[messageId] || {}) };
-      if (!cur[emoji]) cur[emoji] = [];
-      const idx = cur[emoji].indexOf(user?.id);
-      if (idx > -1) { cur[emoji] = cur[emoji].filter(id => id !== user?.id); if (!cur[emoji].length) delete cur[emoji]; }
-      else { cur[emoji] = [...cur[emoji], user?.id]; }
+      if (!cur[reactionId]) cur[reactionId] = [];
+      const idx = cur[reactionId].indexOf(user?.id);
+      if (idx > -1) {
+        cur[reactionId] = cur[reactionId].filter(id => id !== user?.id);
+        if (!cur[reactionId].length) delete cur[reactionId];
+      } else {
+        cur[reactionId] = [...cur[reactionId], user?.id];
+      }
       return { ...prev, [messageId]: cur };
     });
   };
@@ -285,14 +366,18 @@ const Chat = () => {
     if (!r || !Object.values(r).some(a => a.length > 0)) return null;
     return (
       <div style={s.reactionsRow}>
-        {Object.entries(r).map(([emoji, users]) =>
-          users.length > 0 ? (
-            <button key={emoji} onClick={() => handleReact(msg._id, emoji)}
-              style={{ ...s.reactionBadge, backgroundColor: users.includes(user?.id) ? '#2d2d2d' : '#141414', border: `1px solid ${users.includes(user?.id) ? '#555' : '#222'}` }}>
-              {emoji} <span style={s.reactionCount}>{users.length}</span>
+        {REACTIONS.map(({ id, svg, color }) => {
+          const users = r[id] || [];
+          if (!users.length) return null;
+          const reacted = users.includes(user?.id);
+          return (
+            <button key={id} onClick={() => handleReact(msg._id, id)}
+              style={{ ...s.reactionBadge, backgroundColor: reacted ? `${color}22` : '#141414', border: `1px solid ${reacted ? color : '#222'}` }}>
+              {svg}
+              <span style={{ ...s.reactionCount, color: reacted ? color : '#888' }}>{users.length}</span>
             </button>
-          ) : null
-        )}
+          );
+        })}
       </div>
     );
   };
@@ -306,6 +391,7 @@ const Chat = () => {
     return <span style={s.messageText}>{msg.content}</span>;
   };
 
+  // Icons
   const SearchIcon = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>);
   const UserPlusIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>);
   const UsersIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>);
@@ -318,44 +404,33 @@ const Chat = () => {
   const PaperclipIcon = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>);
   const FileIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>);
   const ReplyIcon = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>);
-  const BackIcon = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>);
+  const BackIcon = () => (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>);
 
   const sidebarItems = buildMixedSidebar();
-
-  const MindNestTypingBubble = () => (
-    <div style={{ ...s.messageWrapper, alignItems: 'flex-start' }}>
-      <div style={{ ...s.messageRowInner, flexDirection: 'row' }}>
-        <div style={s.messageAvatar}><div style={{ ...s.messageAvatarPlaceholder, backgroundColor: '#0f1f3d', fontSize: '14px' }}>🤖</div></div>
-        <div style={s.bubbleCol}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: '#4a8fd4', marginBottom: '4px' }}>MindNest AI</div>
-          <div style={{ ...s.messageBubble, backgroundColor: '#0a1628', border: '1px solid #1a3a6a', borderRadius: '4px 18px 18px 18px', color: '#4a8fd4' }}>
-            <span style={{ letterSpacing: '4px', fontSize: '16px' }}>●●●</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   const sidebarVisible = !isMobile || showSidebar;
   const chatVisible = !isMobile || !showSidebar;
 
   return (
     <div style={s.container} onClick={() => setContextMenu(null)}>
 
-      {/* Mobile backdrop */}
-      {isMobile && showSidebar && (selectedFriend || selectedGroup) && (
-        <div onClick={() => setShowSidebar(false)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 50 }} />
-      )}
-
+      {/* Context Menu (desktop right-click + mobile long press) */}
       {contextMenu && (
-        <div ref={contextMenuRef} style={{ ...s.contextMenu, top: contextMenu.y, left: contextMenu.x }} onClick={e => e.stopPropagation()}>
-          <div style={s.contextEmojiRow}>
-            {EMOJI_LIST.map(emoji => {
-              const reacted = reactions[contextMenu.message._id]?.[emoji]?.includes(user?.id);
+        <div ref={contextMenuRef}
+          style={{
+            ...s.contextMenu,
+            top: contextMenu.centered ? '50%' : contextMenu.y,
+            left: contextMenu.centered ? '50%' : contextMenu.x,
+            transform: contextMenu.centered ? 'translate(-50%, -50%)' : 'none',
+          }}
+          onClick={e => e.stopPropagation()}>
+          {/* SVG Reaction row */}
+          <div style={s.contextReactionRow}>
+            {REACTIONS.map(({ id, svg, label, color }) => {
+              const reacted = reactions[contextMenu.message._id]?.[id]?.includes(user?.id);
               return (
-                <button key={emoji} onClick={() => handleReact(contextMenu.message._id, emoji)} title={emoji}
-                  style={{ ...s.contextEmojiBtn, transform: reacted ? 'scale(1.3)' : 'scale(1)', backgroundColor: reacted ? '#2a2a2a' : 'transparent', outline: reacted ? '1px solid #555' : 'none', outlineOffset: '1px' }}>
-                  {emoji}
+                <button key={id} onClick={() => handleReact(contextMenu.message._id, id)} title={label}
+                  style={{ ...s.contextReactionBtn, transform: reacted ? 'scale(1.3)' : 'scale(1)', backgroundColor: reacted ? `${color}22` : 'transparent', outline: reacted ? `1.5px solid ${color}` : 'none', outlineOffset: '2px' }}>
+                  {svg}
                 </button>
               );
             })}
@@ -371,11 +446,7 @@ const Chat = () => {
       )}
 
       {/* Sidebar */}
-      <div style={{
-        ...s.sidebar,
-        display: sidebarVisible ? 'flex' : 'none',
-        width: isMobile ? '100%' : '320px',
-      }}>
+      <div style={{ ...s.sidebar, display: sidebarVisible ? 'flex' : 'none', width: isMobile ? '100%' : '320px' }}>
         <div style={s.searchBar}>
           <div style={s.searchInputWrapper} onClick={() => setShowSearch(true)}>
             <SearchIcon />
@@ -385,10 +456,6 @@ const Chat = () => {
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #1a1a1a' }}>
           <button onClick={() => setShowCreateGroup(true)} style={s.createGroupButton}><UsersIconLg /> Create Group</button>
         </div>
-        <div style={{ padding: '8px 16px', background: '#050d1a', borderBottom: '1px solid #0d1f35', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 14 }}>🤖</span>
-          <span style={{ fontSize: 11, color: '#3a7abf' }}>Type <strong style={{ color: '#4a8fd4' }}>@MindNest</strong> to ask AI</span>
-        </div>
         <div style={s.friendsList}>
           {sidebarItems.map(item => {
             const isDm = item.type === 'dm'; const data = item.data;
@@ -396,7 +463,9 @@ const Chat = () => {
             const pic = isDm ? data.profilePicture : data.groupPicture;
             const name = isDm ? data.username : data.name;
             const lm = data.lastMessage;
-            const preview = isDm ? (lm ? `${lm.isSentByMe ? 'You: ' : ''}${lm.content.length > 28 ? lm.content.substring(0, 28) + '…' : lm.content}` : 'No messages yet') : (lm ? (lm.content.length > 28 ? lm.content.substring(0, 28) + '…' : lm.content) : `${data.members?.length || 0} members`);
+            const preview = isDm
+              ? (lm ? `${lm.isSentByMe ? 'You: ' : ''}${lm.content.length > 28 ? lm.content.substring(0, 28) + '…' : lm.content}` : 'No messages yet')
+              : (lm ? (lm.content.length > 28 ? lm.content.substring(0, 28) + '…' : lm.content) : `${data.members?.length || 0} members`);
             return (
               <div key={(isDm ? 'dm_' : 'grp_') + data._id}
                 onClick={() => isDm ? handleFriendSelect(data) : handleGroupSelect(data)}
@@ -415,23 +484,21 @@ const Chat = () => {
             );
           })}
         </div>
-        {!isMobile && (
-          <div style={s.userFooter}>
-            <div style={s.userFooterLeft}>
-              <div style={s.userAvatar}>
-                {user?.profilePicture ? <img src={user.profilePicture} alt="" style={s.userAvatarImg} /> : <span>{user?.username?.[0]?.toUpperCase() || '?'}</span>}
-              </div>
-              <div style={s.userInfo}>
-                <div style={s.userName}>{user?.username}</div>
-                <div style={s.userStatus}>Online</div>
-              </div>
+        <div style={s.userFooter}>
+          <div style={s.userFooterLeft}>
+            <div style={s.userAvatar}>
+              {user?.profilePicture ? <img src={user.profilePicture} alt="" style={s.userAvatarImg} /> : <span>{user?.username?.[0]?.toUpperCase() || '?'}</span>}
             </div>
-            <div style={s.userFooterActions}>
-              <button onClick={() => navigate('/profile')} style={s.iconBtn} title="Settings"><SettingsIcon /></button>
-              <button onClick={logout} style={s.iconBtn} title="Logout"><LogoutIcon /></button>
+            <div style={s.userInfo}>
+              <div style={s.userName}>{user?.username}</div>
+              <div style={s.userStatus}>Online</div>
             </div>
           </div>
-        )}
+          <div style={s.userFooterActions}>
+            <button onClick={() => navigate('/profile')} style={s.iconBtn} title="Settings"><SettingsIcon /></button>
+            <button onClick={logout} style={s.iconBtn} title="Logout"><LogoutIcon /></button>
+          </div>
+        </div>
       </div>
 
       {/* Chat Area */}
@@ -447,17 +514,18 @@ const Chat = () => {
             onOpenSettings={() => setShowGroupSettings(true)}
             replyTo={replyTo} onCancelReply={() => setReplyTo(null)}
             reactions={reactions} onContextMenu={handleContextMenu}
+            onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
             messageRefs={messageRefs} currentUserId={user?.id}
-            scrollToMessage={scrollToMessage} mindNestTyping={mindNestTyping}
+            scrollToMessage={scrollToMessage}
+            isMobile={isMobile} onBack={() => setShowSidebar(true)}
+            onReact={handleReact} currentUser={user}
           />
         ) : selectedFriend ? (
           <>
             <div style={s.chatHeader}>
               <div style={s.chatHeaderLeft}>
                 {isMobile && (
-                  <button onClick={() => setShowSidebar(true)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '4px 8px 4px 0', display: 'flex', alignItems: 'center' }}>
-                    <BackIcon />
-                  </button>
+                  <button onClick={() => setShowSidebar(true)} style={s.backBtn}><BackIcon /></button>
                 )}
                 <div style={s.chatAvatar}>
                   {selectedFriend.profilePicture ? <img src={selectedFriend.profilePicture} alt="" style={s.chatAvatarImg} /> : <div style={s.chatAvatarPlaceholder}>{selectedFriend.username[0].toUpperCase()}</div>}
@@ -471,22 +539,24 @@ const Chat = () => {
 
             <div style={s.messagesArea}>
               {messages.map((msg, index) => {
-                const isMindNest = msg.isMindNest === true;
-                const isOwn = !isMindNest && msg.sender.username === user?.username;
-                const hasReactions = !isMindNest && reactions[msg._id] && Object.values(reactions[msg._id]).some(a => a.length > 0);
+                const isOwn = msg.sender.username === user?.username;
+                const hasReactions = reactions[msg._id] && Object.values(reactions[msg._id]).some(a => a.length > 0);
                 return (
-                  <div key={index} ref={el => { if (msg._id) messageRefs.current[msg._id] = el; }}
-                    style={{ ...s.messageWrapper, alignItems: isMindNest ? 'flex-start' : isOwn ? 'flex-end' : 'flex-start' }}
-                    onContextMenu={e => !isMindNest && handleContextMenu(e, msg)}>
-                    <div style={{ ...s.messageRowInner, flexDirection: isOwn && !isMindNest ? 'row-reverse' : 'row' }}>
+                  <div key={index}
+                    ref={el => { if (msg._id) messageRefs.current[msg._id] = el; }}
+                    style={{ ...s.messageWrapper, alignItems: isOwn ? 'flex-end' : 'flex-start' }}
+                    onContextMenu={e => handleContextMenu(e, msg)}
+                    onTouchStart={() => handleTouchStart(msg)}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchMove={handleTouchEnd}>
+                    <div style={{ ...s.messageRowInner, flexDirection: isOwn ? 'row-reverse' : 'row' }}>
                       <div style={s.messageAvatar}>
-                        {isMindNest ? <div style={{ ...s.messageAvatarPlaceholder, backgroundColor: '#0f1f3d', fontSize: '14px' }}>🤖</div>
-                          : isOwn ? (user?.profilePicture ? <img src={user.profilePicture} alt="" style={s.messageAvatarImg} /> : <div style={s.messageAvatarPlaceholder}>{user?.username?.[0]?.toUpperCase()}</div>)
+                        {isOwn
+                          ? (user?.profilePicture ? <img src={user.profilePicture} alt="" style={s.messageAvatarImg} /> : <div style={s.messageAvatarPlaceholder}>{user?.username?.[0]?.toUpperCase()}</div>)
                           : (selectedFriend.profilePicture ? <img src={selectedFriend.profilePicture} alt="" style={s.messageAvatarImg} /> : <div style={s.messageAvatarPlaceholder}>{selectedFriend.username[0].toUpperCase()}</div>)}
                       </div>
                       <div style={s.bubbleCol}>
-                        {isMindNest && <div style={{ fontSize: '11px', fontWeight: 700, color: '#4a8fd4', marginBottom: '4px', letterSpacing: '0.3px' }}>🤖 MindNest AI</div>}
-                        <div style={{ ...s.messageBubble, backgroundColor: isMindNest ? '#0a1628' : isOwn ? '#ffffff' : '#1a1a1a', color: isMindNest ? '#a8d4f5' : isOwn ? '#000000' : '#ffffff', borderRadius: isMindNest ? '4px 18px 18px 18px' : isOwn ? '18px 18px 4px 18px' : '18px 18px 18px 4px', border: isMindNest ? '1px solid #1a3a6a' : 'none' }}>
+                        <div style={{ ...s.messageBubble, backgroundColor: isOwn ? '#ffffff' : '#1a1a1a', color: isOwn ? '#000000' : '#ffffff', borderRadius: isOwn ? '18px 18px 4px 18px' : '18px 18px 18px 4px' }}>
                           {msg.replyTo && renderReplyQuote(msg, isOwn, messages)}
                           {renderMessageContent(msg, isOwn)}
                         </div>
@@ -496,7 +566,6 @@ const Chat = () => {
                   </div>
                 );
               })}
-              {mindNestTyping && <MindNestTypingBubble />}
               <div ref={messagesEndRef} />
             </div>
 
@@ -537,9 +606,7 @@ const Chat = () => {
         ) : (
           <div style={s.noChat}>
             {isMobile ? (
-              <button onClick={() => setShowSidebar(true)} style={{ padding: '14px 28px', backgroundColor: '#ffffff', color: '#000', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
-                Open Chats
-              </button>
+              <button onClick={() => setShowSidebar(true)} style={{ padding: '14px 28px', backgroundColor: '#ffffff', color: '#000', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>Open Chats</button>
             ) : (
               <>
                 <MessageIcon />
@@ -589,10 +656,10 @@ const Chat = () => {
 
 const s = {
   container: { display: 'flex', height: '100vh', backgroundColor: '#000000', position: 'relative', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#ffffff', overflow: 'hidden' },
-  contextMenu: { position: 'fixed', zIndex: 9999, backgroundColor: '#111111', border: '1px solid #2a2a2a', borderRadius: '14px', padding: '8px', boxShadow: '0 8px 32px rgba(0,0,0,0.75)', minWidth: '210px' },
-  contextEmojiRow: { display: 'flex', justifyContent: 'space-between', padding: '4px 4px 8px', gap: '2px' },
-  contextEmojiBtn: { border: 'none', cursor: 'pointer', fontSize: '22px', padding: '6px 8px', borderRadius: '8px', transition: 'transform 0.12s, background 0.12s', lineHeight: 1 },
-  contextDivider: { height: '1px', backgroundColor: '#222222', margin: '2px 0 4px' },
+  contextMenu: { position: 'fixed', zIndex: 9999, backgroundColor: '#111111', border: '1px solid #2a2a2a', borderRadius: '16px', padding: '10px', boxShadow: '0 12px 40px rgba(0,0,0,0.85)', minWidth: '230px' },
+  contextReactionRow: { display: 'flex', justifyContent: 'space-between', padding: '4px 4px 10px', gap: '4px' },
+  contextReactionBtn: { border: 'none', cursor: 'pointer', padding: '7px', borderRadius: '10px', transition: 'transform 0.15s, background 0.15s', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  contextDivider: { height: '1px', backgroundColor: '#222222', margin: '2px 0 6px' },
   contextMenuItem: { width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'transparent', border: 'none', color: '#dddddd', cursor: 'pointer', fontSize: '14px', borderRadius: '8px', transition: 'background 0.12s', textAlign: 'left' },
   sidebar: { backgroundColor: '#0a0a0a', borderRight: '1px solid #1a1a1a', flexDirection: 'column', flexShrink: 0, zIndex: 60 },
   searchBar: { padding: '20px', borderBottom: '1px solid #1a1a1a' },
@@ -617,6 +684,7 @@ const s = {
   userStatus: { fontSize: '12px', color: '#666666' },
   userFooterActions: { display: 'flex', gap: '8px' },
   iconBtn: { background: 'none', border: 'none', color: '#666666', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  backBtn: { background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', padding: '4px 8px 4px 0', display: 'flex', alignItems: 'center' },
   chatArea: { flex: 1, flexDirection: 'column', backgroundColor: '#000000', minWidth: 0 },
   chatHeader: { height: '64px', borderBottom: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', padding: '0 16px', backgroundColor: '#0a0a0a', flexShrink: 0 },
   chatHeaderLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
@@ -627,24 +695,24 @@ const s = {
   chatHeaderStatus: { fontSize: '12px', color: '#666666' },
   messagesArea: { flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '6px' },
   messageWrapper: { display: 'flex', flexDirection: 'column', paddingBottom: '2px' },
-  messageRowInner: { display: 'flex', alignItems: 'flex-end', gap: '8px', maxWidth: '85%' },
-  messageAvatar: { width: '28px', height: '28px', flexShrink: 0 },
+  messageRowInner: { display: 'flex', alignItems: 'flex-end', gap: '8px', maxWidth: '80%' },
+  messageAvatar: { width: '30px', height: '30px', flexShrink: 0 },
   messageAvatarImg: { width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' },
   messageAvatarPlaceholder: { width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#ffffff', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600' },
-  bubbleCol: { display: 'flex', flexDirection: 'column', maxWidth: 'calc(100% - 36px)', minWidth: 0 },
+  bubbleCol: { display: 'flex', flexDirection: 'column', maxWidth: 'calc(100% - 38px)', minWidth: 0 },
   messageBubble: { fontSize: '15px', lineHeight: '1.5', wordBreak: 'break-word', overflowWrap: 'anywhere', display: 'flex', flexDirection: 'column', padding: '10px 14px' },
   messageText: { display: 'block' },
-  messageImage: { maxWidth: '220px', maxHeight: '220px', borderRadius: '12px', cursor: 'pointer', display: 'block' },
-  messageVideo: { maxWidth: '220px', maxHeight: '220px', borderRadius: '12px', display: 'block' },
+  messageImage: { maxWidth: '240px', maxHeight: '240px', borderRadius: '12px', cursor: 'pointer', display: 'block' },
+  messageVideo: { maxWidth: '240px', maxHeight: '240px', borderRadius: '12px', display: 'block' },
   fileLink: { display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', padding: '4px 8px' },
+  reactionsRow: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '5px', paddingLeft: '2px' },
+  reactionBadge: { display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.12s' },
+  reactionCount: { fontSize: '12px', fontWeight: '600' },
   replyBanner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', backgroundColor: '#0d0d0d', borderTop: '1px solid #1a1a1a', flexShrink: 0 },
   replyBannerLeft: { display: 'flex', alignItems: 'center', color: '#aaaaaa' },
   replyBannerSender: { fontSize: '12px', fontWeight: '600', color: '#ffffff', marginBottom: '2px' },
   replyBannerText: { fontSize: '12px', color: '#777' },
   replyBannerClose: { background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' },
-  reactionsRow: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '5px', paddingLeft: '2px' },
-  reactionBadge: { display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '12px', cursor: 'pointer', fontSize: '14px', color: '#cccccc', transition: 'all 0.12s' },
-  reactionCount: { fontSize: '12px' },
   filePreviewContainer: { padding: '12px 16px', borderTop: '1px solid #1a1a1a', backgroundColor: '#0a0a0a', flexShrink: 0 },
   filePreviewContent: { display: 'flex', flexDirection: 'column', gap: '12px' },
   filePreviewImage: { maxWidth: '150px', maxHeight: '150px', borderRadius: '8px' },
