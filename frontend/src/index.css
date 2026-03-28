@@ -1,49 +1,63 @@
 /* Hide scrollbar globally */
-body::-webkit-scrollbar {
-  display: none;
-}
+body::-webkit-scrollbar { display: none; }
 
 body {
   margin: 0;
   padding: 0;
-  overflow: hidden; /* Prevent body scroll */
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #000000;
-  height: 100vh;
-}
-
-html {
-  overflow: hidden; /* Prevent html scroll */
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-html::-webkit-scrollbar {
-  display: none;
-}
-
-#root {
-  height: 100vh;
+  /* ✅ FIX: Allow scroll on mobile, prevent on desktop */
+  height: 100%;
   overflow: hidden;
 }
 
-/* Hide all scrollbars everywhere */
-*::-webkit-scrollbar {
-  display: none;
-}
-
-* {
+html {
+  height: 100%;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 
+html::-webkit-scrollbar { display: none; }
+
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Hide scrollbars everywhere except where needed */
+*::-webkit-scrollbar { width: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 4px; }
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: #1a1a1a transparent;
+}
+
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+/* ✅ Mobile: allow body to be scrollable for pages that need it */
+@media (max-width: 768px) {
+  body {
+    overflow: auto;
+    height: auto;
+    min-height: 100vh;
+  }
+  html {
+    overflow: auto;
+    height: auto;
+  }
+  #root {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
 }

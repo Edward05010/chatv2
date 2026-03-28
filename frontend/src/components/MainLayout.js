@@ -11,12 +11,18 @@ const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(true);
   const [hoveredItem, setHoveredItem] = useState(null);
   const [tooltip, setTooltip] = useState({ visible: false, label: '', y: 0 });
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const sidebarRef = useRef(null);
 
-  // Auto-collapse on chat
   useEffect(() => {
     if (location.pathname === '/chat') setCollapsed(true);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', Icon: DashboardIcon },
@@ -38,6 +44,66 @@ const MainLayout = () => {
     setHoveredItem(null);
   };
 
+  // ── Mobile Layout ──
+  if (isMobile) {
+    return (
+      <>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+          * { box-sizing: border-box; }
+          .mobile-nav-btn:active { background-color: #1a1a1a !important; }
+        `}</style>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#000', fontFamily: "'DM Sans', sans-serif" }}>
+          {/* Main content */}
+          <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+            <Outlet />
+          </div>
+
+          {/* Bottom Navigation */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+            background: '#0a0a0a', borderTop: '1px solid #151515',
+            padding: '8px 0 12px', flexShrink: 0,
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+          }}>
+            {navItems.map(({ path, label, Icon }) => {
+              const active = location.pathname === path;
+              return (
+                <button key={path} className="mobile-nav-btn"
+                  onClick={() => navigate(path)}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                    background: 'transparent', border: 'none',
+                    color: active ? '#ffffff' : '#555555',
+                    cursor: 'pointer', padding: '6px 16px', borderRadius: 10,
+                    fontFamily: "'DM Sans', sans-serif", transition: 'all 0.15s',
+                    minWidth: 60,
+                  }}>
+                  <Icon active={active} />
+                  <span style={{ fontSize: 10, fontWeight: active ? 600 : 400 }}>{label}</span>
+                </button>
+              );
+            })}
+            {/* Profile button */}
+            <button className="mobile-nav-btn"
+              onClick={() => navigate('/profile')}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                background: 'transparent', border: 'none',
+                color: location.pathname === '/profile' ? '#ffffff' : '#555555',
+                cursor: 'pointer', padding: '6px 16px', borderRadius: 10,
+                fontFamily: "'DM Sans', sans-serif",
+              }}>
+              <AvatarEl user={user} size={22} />
+              <span style={{ fontSize: 10, fontWeight: location.pathname === '/profile' ? 600 : 400 }}>Profile</span>
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── Desktop Layout ──
   return (
     <>
       <style>{`
@@ -64,15 +130,12 @@ const MainLayout = () => {
           flexShrink: 0,
           zIndex: 100,
         }}>
-
           {/* Logo row */}
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
+            display: 'flex', alignItems: 'center',
             justifyContent: collapsed ? 'center' : 'space-between',
             padding: collapsed ? '22px 0 22px' : '22px 16px 22px',
-            borderBottom: '1px solid #151515',
-            minHeight: 70,
+            borderBottom: '1px solid #151515', minHeight: 70,
           }}>
             {!collapsed && (
               <span style={{ fontSize: 17, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', letterSpacing: '-0.3px' }}>
@@ -98,13 +161,11 @@ const MainLayout = () => {
                   onMouseEnter={e => handleMouseEnterNav(e, label)}
                   onMouseLeave={handleMouseLeaveNav}
                   style={{
-                    display: 'flex', alignItems: 'center',
-                    gap: 12,
+                    display: 'flex', alignItems: 'center', gap: 12,
                     padding: collapsed ? '13px 0' : '12px 18px',
                     justifyContent: collapsed ? 'center' : 'flex-start',
                     background: active ? '#141414' : 'transparent',
-                    border: 'none',
-                    borderLeft: `3px solid ${active ? '#ffffff' : 'transparent'}`,
+                    border: 'none', borderLeft: `3px solid ${active ? '#ffffff' : 'transparent'}`,
                     color: active ? '#fff' : '#666',
                     cursor: 'pointer', fontSize: 14, fontWeight: active ? 600 : 400,
                     width: '100%', whiteSpace: 'nowrap',
@@ -125,8 +186,7 @@ const MainLayout = () => {
             borderTop: '1px solid #151515',
             padding: collapsed ? '16px 0' : '16px 12px',
             display: 'flex', alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'space-between',
-            gap: 8,
+            justifyContent: collapsed ? 'center' : 'space-between', gap: 8,
           }}>
             {collapsed ? (
               <button className="avatar-btn" onClick={() => navigate('/profile')} style={{
@@ -167,11 +227,10 @@ const MainLayout = () => {
           </div>
         </div>
 
-        {/* ── Tooltip (collapsed mode only) ── */}
+        {/* Tooltip */}
         {tooltip.visible && collapsed && (
           <div style={{
-            position: 'fixed', left: 72,
-            top: tooltip.y - 16,
+            position: 'fixed', left: 72, top: tooltip.y - 16,
             background: '#1a1a1a', border: '1px solid #2a2a2a',
             color: '#fff', fontSize: 12, fontWeight: 600,
             padding: '6px 12px', borderRadius: 7,
@@ -183,7 +242,7 @@ const MainLayout = () => {
           </div>
         )}
 
-        {/* ── Main content ── */}
+        {/* Main content */}
         <div style={{ flex: 1, overflow: 'auto', background: '#000', minWidth: 0 }}>
           <Outlet />
         </div>
@@ -192,7 +251,6 @@ const MainLayout = () => {
   );
 };
 
-// ── Avatar helper ─────────────────────────────────────────────────────────────
 const AvatarEl = ({ user, size }) => (
   user?.profilePicture
     ? <img src={user.profilePicture} alt="" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
@@ -201,7 +259,6 @@ const AvatarEl = ({ user, size }) => (
       </div>
 );
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
 const ChevronIcon = ({ collapsed }) => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
     style={{ transition: 'transform 0.22s', transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
