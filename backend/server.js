@@ -546,7 +546,7 @@ const https = require('https');
 const callMindNest = (messages) => {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: `You are MindNest AI, a friendly and smart assistant built into a student chat app called MindNest.
 You help students with their studies, answer questions, explain concepts, help with assignments, and provide support.
