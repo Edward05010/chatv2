@@ -50,6 +50,22 @@ const parseNotification = (text) => {
   return { cleanText: text, milestoneMinutes: null };
 };
 
+// Group 24 raw hourly items into 6 clean 4-hour blocks
+const DAY_BLOCKS = [
+  { label: '12–4am',  hours: [0, 1, 2, 3] },
+  { label: '4–8am',   hours: [4, 5, 6, 7] },
+  { label: '8am–12',  hours: [8, 9, 10, 11] },
+  { label: '12–4pm',  hours: [12, 13, 14, 15] },
+  { label: '4–8pm',   hours: [16, 17, 18, 19] },
+  { label: '8pm–12',  hours: [20, 21, 22, 23] },
+];
+
+const groupDayData = (rawData) =>
+  DAY_BLOCKS.map(block => ({
+    label: block.label,
+    minutes: block.hours.reduce((sum, h) => sum + (rawData[h]?.minutes || 0), 0),
+  }));
+
 const Dashboard = () => {
   const [todos, setTodos] = useState([]);
   const [newTodo, setNewTodo] = useState('');
@@ -90,9 +106,17 @@ const Dashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(`https://chatv2-i91j.onrender.com/api/study-data?timeframe=${timeFrame}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      setStudyData(response.data);
+      if (timeFrame === 'day') {
+        setStudyData(groupDayData(response.data));
+      } else {
+        setStudyData(response.data);
+      }
     } catch (error) {
-      const defaults = { week: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], day: ['00h', '04h', '08h', '12h', '16h', '20h'], month: ['Week 1', 'Week 2', 'Week 3', 'Week 4'] };
+      const defaults = {
+        week:  ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        day:   DAY_BLOCKS.map(b => b.label),
+        month: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+      };
       setStudyData(defaults[timeFrame].map(l => ({ label: l, minutes: 0 })));
     }
   };
@@ -132,23 +156,22 @@ const Dashboard = () => {
     } catch (error) { console.error(error); }
   };
 
-  const maxTime = Math.max(...studyData.map(d => d.minutes)) || 4;
-  const chartMax = Math.ceil(maxTime / 4) * 4;
-  const yAxisLabels = [chartMax, (chartMax / 4) * 3, (chartMax / 4) * 2, chartMax / 4, 0];
+  const maxTime = Math.max(...studyData.map(d => d.minutes), 1);
+  const chartMax = Math.ceil(maxTime / 4) * 4 || 4;
+  const yAxisLabels = [chartMax, Math.round((chartMax / 4) * 3), Math.round((chartMax / 4) * 2), Math.round(chartMax / 4), 0];
 
-  const PlusIcon = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>);
+  const PlusIcon  = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>);
   const CheckIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>);
   const TrashIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>);
-  const BellIcon = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>);
+  const BellIcon  = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>);
   const ClockIcon = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#000', padding: isMobile ? '12px' : '24px', fontFamily: 'sans-serif', boxSizing: 'border-box' }}>
-      
+
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '16px' : '32px' }}>
         <h1 style={{ fontSize: isMobile ? '22px' : '32px', fontWeight: '700', color: '#fff', margin: 0 }}>Dashboard</h1>
-        {/* Clock toggle button on mobile */}
         {isMobile && (
           <button onClick={() => setShowClock(v => !v)} style={{ background: showClock ? '#1a1a1a' : 'transparent', border: '1px solid #2a2a2a', borderRadius: '8px', color: '#fff', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
             <ClockIcon /> {showClock ? 'Hide Clock' : 'Show Clock'}
@@ -156,7 +179,7 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Clock — shown inline on mobile when toggled, always visible on desktop in grid */}
+      {/* Clock inline on mobile */}
       {isMobile && showClock && (
         <div style={{ ...styles.card, marginBottom: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px' }}>
           <h2 style={styles.cardTitle}>Current Time</h2>
@@ -176,13 +199,7 @@ const Dashboard = () => {
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>To-Do List</h2>
           <form onSubmit={addTodo} style={styles.todoForm}>
-            <input
-              type="text"
-              value={newTodo}
-              onChange={(e) => setNewTodo(e.target.value)}
-              placeholder="Add a new task..."
-              style={styles.todoInput}
-            />
+            <input type="text" value={newTodo} onChange={(e) => setNewTodo(e.target.value)} placeholder="Add a new task..." style={styles.todoInput} />
             <button type="submit" style={styles.addButton}><PlusIcon /></button>
           </form>
           <div style={styles.todoList}>
@@ -229,7 +246,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Clock — desktop only in grid */}
+        {/* Clock desktop */}
         {!isMobile && (
           <div style={{ ...styles.card, display: 'flex', flexDirection: 'column' }}>
             <h2 style={styles.cardTitle}>Current Time</h2>
@@ -240,10 +257,14 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Study Progress — full width */}
+        {/* Study Progress */}
         <div style={{ ...styles.card, gridColumn: isMobile ? '1' : '1 / -1' }}>
           <div style={styles.graphHeader}>
-            <h2 style={{ ...styles.cardTitle, margin: 0 }}>Study Progress</h2>
+            <div>
+              <h2 style={{ ...styles.cardTitle, margin: 0 }}>Study Progress</h2>
+              {timeFrame === 'day' && <p style={{ color: '#555', fontSize: '11px', margin: '4px 0 0' }}>Grouped by 4-hour blocks</p>}
+              {timeFrame === 'month' && <p style={{ color: '#555', fontSize: '11px', margin: '4px 0 0' }}>Current month by week</p>}
+            </div>
             <div style={styles.timeframeButtons}>
               {['day', 'week', 'month'].map(tf => (
                 <button key={tf} onClick={() => setTimeFrame(tf)} style={{
@@ -259,9 +280,12 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
+
           <div style={{ ...styles.graphWrapper, gap: isMobile ? '6px' : '12px' }}>
             <div style={{ ...styles.yAxis, minWidth: isMobile ? '24px' : '32px', paddingBottom: isMobile ? '45px' : '55px' }}>
-              {yAxisLabels.map((l, i) => <div key={i} style={{ ...styles.yLabel, fontSize: isMobile ? '9px' : '11px' }}>{l}</div>)}
+              {yAxisLabels.map((l, i) => (
+                <div key={i} style={{ ...styles.yLabel, fontSize: isMobile ? '9px' : '11px' }}>{l}</div>
+              ))}
             </div>
             <div style={{ ...styles.graphArea, height: isMobile ? '200px' : '280px' }}>
               <div style={{ ...styles.gridLines, height: isMobile ? '150px' : '220px' }}>
@@ -272,7 +296,9 @@ const Dashboard = () => {
                   <div key={index} style={styles.barContainer}>
                     {data.minutes > 0
                       ? <div style={{ ...styles.bar, height: `${(data.minutes / chartMax) * 100}%` }}>
-                          <div style={{ ...styles.barValue, fontSize: isMobile ? '9px' : '11px', top: isMobile ? '-18px' : '-22px' }}>{data.minutes}</div>
+                          <div style={{ ...styles.barValue, fontSize: isMobile ? '9px' : '11px', top: isMobile ? '-18px' : '-22px' }}>
+                            {data.minutes}
+                          </div>
                         </div>
                       : <div style={styles.emptyBar} />
                     }
@@ -281,11 +307,19 @@ const Dashboard = () => {
               </div>
               <div style={styles.xAxisLabels}>
                 {studyData.map((data, index) => (
-                  <div key={index} style={{ ...styles.xLabelWrapper, fontSize: isMobile ? '9px' : '12px' }}>{data.label}</div>
+                  <div key={index} style={{ ...styles.xLabelWrapper, fontSize: isMobile ? '9px' : '11px' }}>
+                    {data.label}
+                  </div>
                 ))}
               </div>
             </div>
           </div>
+
+          {studyData.every(d => d.minutes === 0) && (
+            <div style={{ textAlign: 'center', color: '#444', fontSize: '13px', marginTop: '8px', paddingBottom: '4px' }}>
+              No study sessions logged {timeFrame === 'day' ? 'today' : timeFrame === 'week' ? 'this week' : 'this month'} yet
+            </div>
+          )}
         </div>
 
       </div>
@@ -312,7 +346,7 @@ const styles = {
   achievementLabel: { fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px', marginBottom: '3px', textTransform: 'uppercase' },
   notificationText: { color: '#fff', fontSize: '12px', margin: '0 0 3px 0', lineHeight: '1.4' },
   notificationTime: { color: '#555', fontSize: '11px', margin: 0 },
-  graphHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' },
+  graphHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' },
   timeframeButtons: { display: 'flex', gap: '6px' },
   timeframeBtn: { borderRadius: '8px', cursor: 'pointer', fontFamily: 'sans-serif' },
   graphWrapper: { display: 'flex', marginTop: '16px' },
@@ -327,7 +361,7 @@ const styles = {
   barValue: { position: 'absolute', width: '100%', textAlign: 'center', color: '#fff', fontWeight: 'bold' },
   emptyBar: { height: 0 },
   xAxisLabels: { display: 'flex', justifyContent: 'space-around', marginTop: '8px' },
-  xLabelWrapper: { flex: 1, textAlign: 'center', color: '#666' },
+  xLabelWrapper: { flex: 1, textAlign: 'center', color: '#666', wordBreak: 'break-word' },
   clockWrapper: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' },
   dateText: { marginTop: '12px', color: '#666', fontSize: '13px', textAlign: 'center' },
 };

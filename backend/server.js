@@ -459,7 +459,8 @@ app.get('/api/study-data', auth, async (req, res) => {
         labels.push(days[date.getDay()]);
       }
     } else if (timeframe === 'month') {
-      startDate.setDate(startDate.getDate() - 29);
+      // Use the actual start of the current month, not 30 days ago
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
       startDate.setHours(0, 0, 0, 0);
       for (let i = 1; i <= 4; i++) labels.push(`Week ${i}`);
     }
@@ -477,10 +478,12 @@ app.get('/api/study-data', auth, async (req, res) => {
       });
       data = labels.map((label, i) => ({ label, minutes: dailyData[i] }));
     } else if (timeframe === 'month') {
+      // Assign each session to week 1–4 based on day of month
       const weeklyData = new Array(4).fill(0);
       sessions.forEach(s => {
-        const w = Math.floor((new Date(s.date) - startDate) / 604800000);
-        if (w >= 0 && w < 4) weeklyData[w] += s.minutes;
+        const dayOfMonth = new Date(s.date).getDate(); // 1–31
+        const weekIndex = Math.min(Math.floor((dayOfMonth - 1) / 7), 3); // 0–3
+        weeklyData[weekIndex] += s.minutes;
       });
       data = labels.map((label, i) => ({ label, minutes: weeklyData[i] }));
     }
