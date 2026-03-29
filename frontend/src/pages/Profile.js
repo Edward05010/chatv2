@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
@@ -40,8 +40,7 @@ const GemSVG = ({ tier, earned, size = 48 }) => {
   return <svg width={size} height={h} viewBox="0 0 56 64" dangerouslySetInnerHTML={{ __html: glowFilter + (shapes[tier.name] || '') }} />;
 };
 
-// ── Canvas helpers ────────────────────────────────────────────────────────────
-
+// Canvas helpers
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -68,28 +67,25 @@ function polygon(sides, r) {
 function drawGemCanvas(ctx, tier, earned, cx, cy, r) {
   const c = tier.color;
   const gemShapes = {
-    Spark:    [[0, -r], [r * 0.7, r * 0.3], [0, r * 0.8], [-r * 0.7, r * 0.3]],
-    Quartz:   [[0, -r], [r, 0], [0, r], [-r, 0]],
-    Topaz:    [[0, -r], [r, 0], [0, r], [-r, 0]],
-    Citrine:  polygon(5, r),
-    Amber:    polygon(5, r),
-    Ruby:     polygon(6, r),
+    Spark: [[0, -r], [r * 0.7, r * 0.3], [0, r * 0.8], [-r * 0.7, r * 0.3]],
+    Quartz: [[0, -r], [r, 0], [0, r], [-r, 0]],
+    Topaz: [[0, -r], [r, 0], [0, r], [-r, 0]],
+    Citrine: polygon(5, r),
+    Amber: polygon(5, r),
+    Ruby: polygon(6, r),
     Amethyst: polygon(6, r),
     Sapphire: polygon(8, r),
-    Emerald:  polygon(8, r),
-    Diamond:  polygon(8, r),
+    Emerald: polygon(8, r),
+    Diamond: polygon(8, r),
   };
   const pts = gemShapes[tier.name] || polygon(6, r);
 
   ctx.save();
-
-  // Glow for earned
   if (earned) {
     ctx.shadowColor = c;
     ctx.shadowBlur = 18;
   }
 
-  // Outer shape fill
   ctx.beginPath();
   pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(cx + x, cy + y) : ctx.lineTo(cx + x, cy + y));
   ctx.closePath();
@@ -97,14 +93,12 @@ function drawGemCanvas(ctx, tier, earned, cx, cy, r) {
   ctx.globalAlpha = earned ? 0.18 : 0.05;
   ctx.fill();
 
-  // Outer shape stroke
   ctx.globalAlpha = earned ? 1 : 0.25;
   ctx.strokeStyle = c;
   ctx.lineWidth = 2;
   ctx.shadowBlur = 0;
   ctx.stroke();
 
-  // Inner highlight
   const inner = pts.map(([x, y]) => [x * 0.5, y * 0.5]);
   ctx.beginPath();
   inner.forEach(([x, y], i) => i === 0 ? ctx.moveTo(cx + x, cy + y) : ctx.lineTo(cx + x, cy + y));
@@ -116,37 +110,42 @@ function drawGemCanvas(ctx, tier, earned, cx, cy, r) {
   ctx.restore();
 }
 
-// ── Download card generator ───────────────────────────────────────────────────
-
 const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) => {
   const canvas = document.createElement('canvas');
   const W = 820, H = 1460;
-  canvas.width = W; canvas.height = H;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  // Background
   ctx.fillStyle = '#0d0d0d';
   ctx.fillRect(0, 0, W, H);
 
-  // Grid lines
   ctx.strokeStyle = '#ffffff08';
   ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 60) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  for (let x = 0; x < W; x += 60) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 60) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
 
-  // Rainbow top bar
   const rainbow = ctx.createLinearGradient(0, 0, W, 0);
-  rainbow.addColorStop(0,    '#ff595e');
+  rainbow.addColorStop(0, '#ff595e');
   rainbow.addColorStop(0.17, '#ff924c');
   rainbow.addColorStop(0.33, '#ffca3a');
-  rainbow.addColorStop(0.5,  '#8ac926');
+  rainbow.addColorStop(0.5, '#8ac926');
   rainbow.addColorStop(0.67, '#1982c4');
   rainbow.addColorStop(0.83, '#6a4c93');
-  rainbow.addColorStop(1,    '#ff595e');
+  rainbow.addColorStop(1, '#ff595e');
   ctx.fillStyle = rainbow;
   ctx.fillRect(0, 0, W, 8);
 
-  // App name
   ctx.font = 'bold 36px sans-serif';
   ctx.fillStyle = '#ffffff';
   ctx.fillText('StudyChat', 56, 80);
@@ -154,7 +153,6 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
   ctx.fillStyle = '#555555';
   ctx.fillText(monthName.toUpperCase(), 56, 112);
 
-  // Gem badge top right
   const earnedCount = earnedMilestones.length;
   const badgeText = `${earnedCount} / 10 gems`;
   ctx.font = 'bold 18px sans-serif';
@@ -166,7 +164,6 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
   ctx.fillStyle = '#ffffff';
   ctx.fillText(badgeText, bx + 16, by + 26);
 
-  // Big hours number
   const hours = (totalMinutes / 60).toFixed(1);
   ctx.font = 'bold 150px sans-serif';
   ctx.fillStyle = '#ffffff';
@@ -176,12 +173,10 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
   ctx.fillStyle = '#555555';
   ctx.fillText(' hrs studied this month', 48 + numW + 6, 318);
 
-  // Username
   ctx.font = 'bold 42px sans-serif';
   ctx.fillStyle = '#ffffff';
   ctx.fillText(`@${username}`, 48, 395);
 
-  // Progress bar
   const barX = 48, barY = 428, barW = W - 96, barH = 6;
   ctx.fillStyle = '#1a1a1a';
   roundRect(ctx, barX, barY, barW, barH, 3);
@@ -199,7 +194,6 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
   ctx.fillStyle = '#555555';
   ctx.fillText(`${earnedCount} of 10 gems unlocked`, 48, 472);
 
-  // Gem grid — 5 cols × 2 rows
   const cols = 5;
   const cellW = (W - 96 - (cols - 1) * 16) / cols;
   const cellH = 230;
@@ -212,12 +206,10 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
     const cy = startY + row * (cellH + 16);
     const earned = earnedMilestones.includes(m.minutes);
 
-    // Card background
     ctx.fillStyle = '#111111';
     roundRect(ctx, cx, cy, cellW, cellH, 12);
     ctx.fill();
 
-    // Card border
     if (earned) {
       ctx.strokeStyle = m.color + '55';
       ctx.lineWidth = 1.5;
@@ -225,23 +217,19 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
       ctx.stroke();
     }
 
-    // Gem
     drawGemCanvas(ctx, m, earned, cx + cellW / 2, cy + 90, 40);
 
-    // Name
     ctx.textAlign = 'center';
     ctx.font = `${earned ? 'bold' : '500'} 20px sans-serif`;
     ctx.fillStyle = earned ? m.color : '#333333';
     ctx.globalAlpha = 1;
     ctx.fillText(m.name, cx + cellW / 2, cy + 168);
 
-    // Label
     ctx.font = '400 16px sans-serif';
     ctx.fillStyle = '#444444';
     ctx.fillText(m.label, cx + cellW / 2, cy + 192);
     ctx.textAlign = 'left';
 
-    // Lock icon for unearned
     if (!earned) {
       ctx.font = '15px sans-serif';
       ctx.fillStyle = '#2a2a2a';
@@ -249,7 +237,6 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
     }
   });
 
-  // Footer
   ctx.globalAlpha = 1;
   ctx.font = '400 20px sans-serif';
   ctx.fillStyle = '#333333';
@@ -259,14 +246,11 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
   ctx.fillText('Keep studying 🚀', W - 48, H - 40);
   ctx.textAlign = 'left';
 
-  // Trigger download
   const link = document.createElement('a');
-  link.download = `studychat-${monthName.toLowerCase().replace(' ', '-')}.png`;
+  link.download = `studychat-${monthName.toLowerCase().replace(/ /g, '-')}.png`;
   link.href = canvas.toDataURL('image/png');
   link.click();
 };
-
-// ── Profile Component ─────────────────────────────────────────────────────────
 
 const Profile = () => {
   const [email, setEmail] = useState('');
@@ -280,11 +264,12 @@ const Profile = () => {
   const [totalMinutes, setTotalMinutes] = useState(0);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadProfile(); loadAchievements();
+    loadProfile();
+    loadAchievements();
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -298,7 +283,9 @@ const Profile = () => {
       });
       setEmail(res.data.email);
       setProfilePicture(res.data.profilePicture);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const loadAchievements = async () => {
@@ -309,7 +296,9 @@ const Profile = () => {
       });
       setEarnedMilestones(res.data.earned || []);
       setTotalMinutes(res.data.totalMinutes || 0);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleFileSelect = (e) => {
@@ -323,7 +312,10 @@ const Profile = () => {
   };
 
   const handleUploadPicture = async () => {
-    if (!selectedFile) { showMessage('Please select a file first', 'error'); return; }
+    if (!selectedFile) {
+      showMessage('Please select a file first', 'error');
+      return;
+    }
     setLoading(true);
     const formData = new FormData();
     formData.append('profilePicture', selectedFile);
@@ -333,31 +325,41 @@ const Profile = () => {
         headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
       });
       setProfilePicture(res.data.profilePicture);
-      setSelectedFile(null); setPreview('');
+      setSelectedFile(null);
+      setPreview('');
       showMessage('Profile picture updated!', 'success');
       setTimeout(() => window.location.reload(), 1500);
-    } catch (e) { showMessage(e.response?.data?.error || 'Error uploading picture', 'error'); }
-    finally { setLoading(false); }
+    } catch (e) {
+      showMessage(e.response?.data?.error || 'Error uploading picture', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleUpdateEmail = async (e) => {
-    e.preventDefault(); setLoading(true);
+    e.preventDefault();
+    setLoading(true);
     try {
       const token = localStorage.getItem('token');
       await axios.put('https://chatv2-i91j.onrender.com/api/profile', { email }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       showMessage('Email updated!', 'success');
-    } catch (e) { showMessage(e.response?.data?.error || 'Error updating email', 'error'); }
-    finally { setLoading(false); }
+    } catch (e) {
+      showMessage(e.response?.data?.error || 'Error updating email', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const showMessage = (msg, type) => {
-    setMessage(msg); setMessageType(type);
+    setMessage(msg);
+    setMessageType(type);
     setTimeout(() => setMessage(''), 3000);
   };
 
   const handleDownloadCard = () => {
+    console.log('Download button clicked!'); // DEBUG
     const monthName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     downloadCard({ username: user?.username || 'user', totalMinutes, earnedMilestones, monthName });
   };
@@ -368,21 +370,14 @@ const Profile = () => {
   const nextMilestone = MILESTONES.find(m => !earnedMilestones.includes(m.minutes));
   const hoursThisMonth = (totalMinutes / 60).toFixed(1);
 
-  const UploadIcon   = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>);
-  const SaveIcon     = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>);
-  const TrashIcon    = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>);
+  const UploadIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>);
+  const SaveIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>);
+  const TrashIcon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>);
   const DownloadIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>);
 
   return (
-    // KEY FIX: height:100% + overflowY:auto so it scrolls inside MainLayout's flex container
-    <div style={{
-      backgroundColor: '#000000',
-      height: '100%',
-      overflowY: 'auto',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      color: '#ffffff',
-    }}>
-      {/* Header */}
+    <div style={{ backgroundColor: '#000000', minHeight: '100%', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#ffffff', paddingBottom: '40px' }}>
+      
       <div style={{ padding: isMobile ? '20px 16px 16px' : '32px 40px 20px', borderBottom: '1px solid #1a1a1a' }}>
         <h1 style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: '700', color: '#ffffff', margin: 0 }}>My Account</h1>
       </div>
@@ -393,8 +388,7 @@ const Profile = () => {
         </div>
       )}
 
-      {/* Content — no maxWidth so it fills the available space naturally */}
-      <div style={{ padding: isMobile ? '16px' : '28px 40px' }}>
+      <div style={{ padding: isMobile ? '16px' : '28px 40px', maxWidth: '1400px' }}>
 
         {/* Profile Picture */}
         <div style={{ marginBottom: '32px' }}>
@@ -402,10 +396,13 @@ const Profile = () => {
           <p style={{ fontSize: '13px', color: '#666666', margin: '0 0 20px' }}>Upload a custom avatar</p>
           <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <div style={{ width: '96px', height: '96px', flexShrink: 0 }}>
-              {profilePicture
-                ? <img src={profilePicture} alt="Profile" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '3px solid #1a1a1a' }} />
-                : <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#ffffff', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', fontWeight: '700' }}>{user?.username?.[0]?.toUpperCase() || '?'}</div>
-              }
+              {profilePicture ? (
+                <img src={profilePicture} alt="Profile" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '3px solid #1a1a1a' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', borderRadius: '50%', backgroundColor: '#ffffff', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', fontWeight: '700' }}>
+                  {user?.username?.[0]?.toUpperCase() || '?'}
+                </div>
+              )}
             </div>
             <div style={{ flex: 1, minWidth: '200px' }}>
               <input type="file" accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} id="fileInput" />
@@ -444,12 +441,11 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Progress bar */}
           <div style={{ height: '4px', backgroundColor: '#1a1a1a', borderRadius: '2px', overflow: 'hidden', marginBottom: '20px' }}>
             <div style={{ height: '100%', background: 'linear-gradient(90deg, #818cf8, #38bdf8)', borderRadius: '2px', width: `${(earnedCount / totalCount) * 100}%`, transition: 'width 0.6s ease' }} />
           </div>
 
-          {/* Gem grid */}
+          {/* Gem grid - RESPONSIVE */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(5, 1fr)' : 'repeat(10, 1fr)', gap: isMobile ? '8px' : '12px', marginBottom: '20px' }}>
             {MILESTONES.map(milestone => {
               const earned = earnedMilestones.includes(milestone.minutes);
@@ -476,16 +472,31 @@ const Profile = () => {
             </div>
           )}
 
-          {/* Download card button */}
+          {/* DOWNLOAD BUTTON - MADE MORE VISIBLE */}
           <button
             onClick={handleDownloadCard}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '14px 20px', backgroundColor: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '12px', color: '#ffffff', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = '#555'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = '#2a2a2a'}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              gap: '10px', 
+              width: '100%', 
+              padding: '16px 20px', 
+              backgroundColor: '#ffffff', 
+              border: 'none', 
+              borderRadius: '12px', 
+              color: '#000000', 
+              fontSize: '15px', 
+              fontWeight: '700', 
+              cursor: 'pointer',
+              transition: 'transform 0.2s'
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
           >
             <DownloadIcon />
             Download my stats card
-            <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#555' }}>PNG</span>
+            <span style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: '600', opacity: 0.6 }}>PNG</span>
           </button>
         </div>
 
@@ -526,7 +537,7 @@ const Profile = () => {
               <div style={{ fontSize: '15px', fontWeight: '600', color: '#ffffff', marginBottom: '4px' }}>Logout</div>
               <div style={{ fontSize: '13px', color: '#999999' }}>Sign out from this device</div>
             </div>
-            <button onClick={logout} style={{ padding: '10px 20px', backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+            <button onClick={() => navigate('/login')} style={{ padding: '10px 20px', backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
               Logout
             </button>
           </div>
