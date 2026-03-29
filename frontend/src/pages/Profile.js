@@ -40,10 +40,87 @@ const GemSVG = ({ tier, earned, size = 48 }) => {
   return <svg width={size} height={h} viewBox="0 0 56 64" dangerouslySetInnerHTML={{ __html: glowFilter + (shapes[tier.name] || '') }} />;
 };
 
-// ===== DOWNLOAD CARD =====
+// ── Canvas helpers ────────────────────────────────────────────────────────────
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function polygon(sides, r) {
+  const pts = [];
+  for (let i = 0; i < sides; i++) {
+    const a = (2 * Math.PI * i) / sides - Math.PI / 2;
+    pts.push([r * Math.cos(a), r * Math.sin(a)]);
+  }
+  return pts;
+}
+
+function drawGemCanvas(ctx, tier, earned, cx, cy, r) {
+  const c = tier.color;
+  const gemShapes = {
+    Spark:    [[0, -r], [r * 0.7, r * 0.3], [0, r * 0.8], [-r * 0.7, r * 0.3]],
+    Quartz:   [[0, -r], [r, 0], [0, r], [-r, 0]],
+    Topaz:    [[0, -r], [r, 0], [0, r], [-r, 0]],
+    Citrine:  polygon(5, r),
+    Amber:    polygon(5, r),
+    Ruby:     polygon(6, r),
+    Amethyst: polygon(6, r),
+    Sapphire: polygon(8, r),
+    Emerald:  polygon(8, r),
+    Diamond:  polygon(8, r),
+  };
+  const pts = gemShapes[tier.name] || polygon(6, r);
+
+  ctx.save();
+
+  // Glow for earned
+  if (earned) {
+    ctx.shadowColor = c;
+    ctx.shadowBlur = 18;
+  }
+
+  // Outer shape fill
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(cx + x, cy + y) : ctx.lineTo(cx + x, cy + y));
+  ctx.closePath();
+  ctx.fillStyle = c;
+  ctx.globalAlpha = earned ? 0.18 : 0.05;
+  ctx.fill();
+
+  // Outer shape stroke
+  ctx.globalAlpha = earned ? 1 : 0.25;
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 0;
+  ctx.stroke();
+
+  // Inner highlight
+  const inner = pts.map(([x, y]) => [x * 0.5, y * 0.5]);
+  ctx.beginPath();
+  inner.forEach(([x, y], i) => i === 0 ? ctx.moveTo(cx + x, cy + y) : ctx.lineTo(cx + x, cy + y));
+  ctx.closePath();
+  ctx.fillStyle = c;
+  ctx.globalAlpha = earned ? 0.4 : 0.08;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ── Download card generator ───────────────────────────────────────────────────
+
 const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) => {
   const canvas = document.createElement('canvas');
-  const W = 820, H = 1450;
+  const W = 820, H = 1460;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
@@ -70,11 +147,11 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
   ctx.fillRect(0, 0, W, 8);
 
   // App name
-  ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.font = 'bold 36px sans-serif';
   ctx.fillStyle = '#ffffff';
   ctx.fillText('StudyChat', 56, 80);
   ctx.font = '500 22px sans-serif';
-  ctx.fillStyle = '#666';
+  ctx.fillStyle = '#555555';
   ctx.fillText(monthName.toUpperCase(), 56, 112);
 
   // Gem badge top right
@@ -87,44 +164,46 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
   roundRect(ctx, bx, by, bw, 38, 19);
   ctx.fill();
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(badgeText, bx + 16, by + 25);
+  ctx.fillText(badgeText, bx + 16, by + 26);
 
   // Big hours number
   const hours = (totalMinutes / 60).toFixed(1);
-  ctx.font = 'bold 160px sans-serif';
+  ctx.font = 'bold 150px sans-serif';
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(hours, 48, 340);
+  ctx.fillText(hours, 48, 330);
   const numW = ctx.measureText(hours).width;
-  ctx.font = '300 52px sans-serif';
-  ctx.fillStyle = '#555';
-  ctx.fillText(' hrs studied this month', 48 + numW + 8, 330);
+  ctx.font = '300 46px sans-serif';
+  ctx.fillStyle = '#555555';
+  ctx.fillText(' hrs studied this month', 48 + numW + 6, 318);
 
   // Username
-  ctx.font = 'bold 44px sans-serif';
+  ctx.font = 'bold 42px sans-serif';
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(`@${username}`, 48, 410);
+  ctx.fillText(`@${username}`, 48, 395);
 
-  // Divider line
-  const earnedForBar = earnedCount / 10;
+  // Progress bar
+  const barX = 48, barY = 428, barW = W - 96, barH = 6;
   ctx.fillStyle = '#1a1a1a';
-  roundRect(ctx, 48, 445, W - 96, 6, 3);
+  roundRect(ctx, barX, barY, barW, barH, 3);
   ctx.fill();
-  const grad = ctx.createLinearGradient(48, 0, 48 + (W - 96) * earnedForBar, 0);
-  grad.addColorStop(0, '#818cf8');
-  grad.addColorStop(1, '#38bdf8');
-  ctx.fillStyle = grad;
-  roundRect(ctx, 48, 445, (W - 96) * earnedForBar, 6, 3);
-  ctx.fill();
+  if (earnedCount > 0) {
+    const grad = ctx.createLinearGradient(barX, 0, barX + barW * (earnedCount / 10), 0);
+    grad.addColorStop(0, '#818cf8');
+    grad.addColorStop(1, '#38bdf8');
+    ctx.fillStyle = grad;
+    roundRect(ctx, barX, barY, barW * (earnedCount / 10), barH, 3);
+    ctx.fill();
+  }
 
-  ctx.font = '500 22px sans-serif';
-  ctx.fillStyle = '#555';
-  ctx.fillText(`${earnedCount} of 10 gems unlocked`, 48, 490);
+  ctx.font = '500 20px sans-serif';
+  ctx.fillStyle = '#555555';
+  ctx.fillText(`${earnedCount} of 10 gems unlocked`, 48, 472);
 
-  // Gem grid — 5 columns × 2 rows
+  // Gem grid — 5 cols × 2 rows
   const cols = 5;
   const cellW = (W - 96 - (cols - 1) * 16) / cols;
-  const cellH = 220;
-  const startX = 48, startY = 510;
+  const cellH = 230;
+  const startX = 48, startY = 494;
 
   MILESTONES.forEach((m, i) => {
     const col = i % cols;
@@ -133,11 +212,12 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
     const cy = startY + row * (cellH + 16);
     const earned = earnedMilestones.includes(m.minutes);
 
-    // Card bg
+    // Card background
     ctx.fillStyle = '#111111';
     roundRect(ctx, cx, cy, cellW, cellH, 12);
     ctx.fill();
 
+    // Card border
     if (earned) {
       ctx.strokeStyle = m.color + '55';
       ctx.lineWidth = 1.5;
@@ -145,127 +225,49 @@ const downloadCard = ({ username, totalMinutes, earnedMilestones, monthName }) =
       ctx.stroke();
     }
 
-    // Draw gem using SVG-to-canvas approach via Image
-    // We'll draw a simplified polygon gem directly on canvas
-    drawGemCanvas(ctx, m, earned, cx + cellW / 2, cy + 80, 38);
+    // Gem
+    drawGemCanvas(ctx, m, earned, cx + cellW / 2, cy + 90, 40);
 
     // Name
-    ctx.font = `${earned ? 'bold' : '500'} 20px sans-serif`;
-    ctx.fillStyle = earned ? m.color : '#333';
     ctx.textAlign = 'center';
-    ctx.fillText(m.name, cx + cellW / 2, cy + 160);
+    ctx.font = `${earned ? 'bold' : '500'} 20px sans-serif`;
+    ctx.fillStyle = earned ? m.color : '#333333';
+    ctx.globalAlpha = 1;
+    ctx.fillText(m.name, cx + cellW / 2, cy + 168);
 
     // Label
     ctx.font = '400 16px sans-serif';
-    ctx.fillStyle = '#444';
-    ctx.fillText(m.label, cx + cellW / 2, cy + 185);
+    ctx.fillStyle = '#444444';
+    ctx.fillText(m.label, cx + cellW / 2, cy + 192);
     ctx.textAlign = 'left';
 
     // Lock icon for unearned
     if (!earned) {
-      ctx.font = '16px sans-serif';
+      ctx.font = '15px sans-serif';
       ctx.fillStyle = '#2a2a2a';
-      ctx.fillText('🔒', cx + cellW - 28, cy + 24);
+      ctx.fillText('🔒', cx + cellW - 30, cy + 26);
     }
   });
 
   // Footer
+  ctx.globalAlpha = 1;
   ctx.font = '400 20px sans-serif';
-  ctx.fillStyle = '#333';
+  ctx.fillStyle = '#333333';
+  ctx.textAlign = 'left';
   ctx.fillText('studychat.app', 48, H - 40);
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#333';
   ctx.fillText('Keep studying 🚀', W - 48, H - 40);
   ctx.textAlign = 'left';
 
-  // Download
+  // Trigger download
   const link = document.createElement('a');
   link.download = `studychat-${monthName.toLowerCase().replace(' ', '-')}.png`;
   link.href = canvas.toDataURL('image/png');
   link.click();
 };
 
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
+// ── Profile Component ─────────────────────────────────────────────────────────
 
-function drawGemCanvas(ctx, tier, earned, cx, cy, r) {
-  const c = tier.color;
-  const alpha = earned ? 1 : 0.25;
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-
-  const gemShapes = {
-    Spark:    [[0, -r], [r * 0.7, r * 0.3], [0, r * 0.8], [-r * 0.7, r * 0.3]],
-    Quartz:   [[0, -r], [r, 0], [0, r], [-r, 0]],
-    Topaz:    [[0, -r], [r, 0], [0, r], [-r, 0]],
-    Citrine:  polygon(5, r),
-    Amber:    polygon(5, r),
-    Ruby:     polygon(6, r),
-    Amethyst: polygon(6, r),
-    Sapphire: polygon(8, r),
-    Emerald:  polygon(8, r),
-    Diamond:  polygon(8, r),
-  };
-
-  const pts = gemShapes[tier.name] || polygon(6, r);
-
-  // Outer shape
-  ctx.beginPath();
-  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(cx + x, cy + y) : ctx.lineTo(cx + x, cy + y));
-  ctx.closePath();
-  ctx.strokeStyle = c;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.fillStyle = c;
-  ctx.globalAlpha = earned ? 0.18 : 0.05;
-  ctx.fill();
-
-  // Inner highlight
-  ctx.globalAlpha = earned ? 0.4 : 0.08;
-  const inner = pts.slice(0, Math.ceil(pts.length / 2) + 1).map(([x, y]) => [x * 0.5, y * 0.5]);
-  ctx.beginPath();
-  inner.forEach(([x, y], i) => i === 0 ? ctx.moveTo(cx + x, cy + y) : ctx.lineTo(cx + x, cy + y));
-  ctx.closePath();
-  ctx.fillStyle = c;
-  ctx.fill();
-
-  if (earned) {
-    ctx.globalAlpha = 0.15;
-    ctx.shadowColor = c;
-    ctx.shadowBlur = 20;
-    ctx.beginPath();
-    pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(cx + x, cy + y) : ctx.lineTo(cx + x, cy + y));
-    ctx.closePath();
-    ctx.fillStyle = c;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-  }
-
-  ctx.restore();
-}
-
-function polygon(sides, r) {
-  const pts = [];
-  for (let i = 0; i < sides; i++) {
-    const a = (2 * Math.PI * i) / sides - Math.PI / 2;
-    pts.push([r * Math.cos(a), r * Math.sin(a)]);
-  }
-  return pts;
-}
-
-// ===== PROFILE COMPONENT =====
 const Profile = () => {
   const [email, setEmail] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
@@ -291,7 +293,9 @@ const Profile = () => {
   const loadProfile = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('https://chatv2-i91j.onrender.com/api/profile', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.get('https://chatv2-i91j.onrender.com/api/profile', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setEmail(res.data.email);
       setProfilePicture(res.data.profilePicture);
     } catch (e) { console.error(e); }
@@ -300,7 +304,9 @@ const Profile = () => {
   const loadAchievements = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('https://chatv2-i91j.onrender.com/api/achievements', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.get('https://chatv2-i91j.onrender.com/api/achievements', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setEarnedMilestones(res.data.earned || []);
       setTotalMinutes(res.data.totalMinutes || 0);
     } catch (e) { console.error(e); }
@@ -338,7 +344,9 @@ const Profile = () => {
     e.preventDefault(); setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.put('https://chatv2-i91j.onrender.com/api/profile', { email }, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.put('https://chatv2-i91j.onrender.com/api/profile', { email }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       showMessage('Email updated!', 'success');
     } catch (e) { showMessage(e.response?.data?.error || 'Error updating email', 'error'); }
     finally { setLoading(false); }
@@ -360,14 +368,20 @@ const Profile = () => {
   const nextMilestone = MILESTONES.find(m => !earnedMilestones.includes(m.minutes));
   const hoursThisMonth = (totalMinutes / 60).toFixed(1);
 
-  const UploadIcon    = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>);
-  const SaveIcon      = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>);
-  const TrashIcon     = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>);
-  const DownloadIcon  = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>);
+  const UploadIcon   = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>);
+  const SaveIcon     = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>);
+  const TrashIcon    = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>);
+  const DownloadIcon = () => (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>);
 
   return (
-    <div style={{ backgroundColor: '#000000', minHeight: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#ffffff' }}>
-
+    // KEY FIX: height:100% + overflowY:auto so it scrolls inside MainLayout's flex container
+    <div style={{
+      backgroundColor: '#000000',
+      height: '100%',
+      overflowY: 'auto',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      color: '#ffffff',
+    }}>
       {/* Header */}
       <div style={{ padding: isMobile ? '20px 16px 16px' : '32px 40px 20px', borderBottom: '1px solid #1a1a1a' }}>
         <h1 style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: '700', color: '#ffffff', margin: 0 }}>My Account</h1>
@@ -379,7 +393,8 @@ const Profile = () => {
         </div>
       )}
 
-      <div style={{ padding: isMobile ? '16px' : '28px 40px', maxWidth: isMobile ? '100%' : '960px' }}>
+      {/* Content — no maxWidth so it fills the available space naturally */}
+      <div style={{ padding: isMobile ? '16px' : '28px 40px' }}>
 
         {/* Profile Picture */}
         <div style={{ marginBottom: '32px' }}>
@@ -424,10 +439,8 @@ const Profile = () => {
               <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#ffffff', margin: '0 0 4px' }}>Monthly Achievements</h3>
               <p style={{ fontSize: '13px', color: '#666666', margin: 0 }}>{monthName} · {hoursThisMonth} hrs studied</p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ padding: '6px 14px', backgroundColor: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '20px' }}>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: '#ffffff' }}>{earnedCount} / {totalCount}</span>
-              </div>
+            <div style={{ padding: '6px 14px', backgroundColor: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '20px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#ffffff' }}>{earnedCount} / {totalCount}</span>
             </div>
           </div>
 
@@ -436,15 +449,15 @@ const Profile = () => {
             <div style={{ height: '100%', background: 'linear-gradient(90deg, #818cf8, #38bdf8)', borderRadius: '2px', width: `${(earnedCount / totalCount) * 100}%`, transition: 'width 0.6s ease' }} />
           </div>
 
-          {/* Gem grid — 5 cols on both mobile and desktop */}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(5, 1fr)' : 'repeat(5, 1fr)', gap: isMobile ? '8px' : '14px', marginBottom: '20px' }}>
+          {/* Gem grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(5, 1fr)' : 'repeat(10, 1fr)', gap: isMobile ? '8px' : '12px', marginBottom: '20px' }}>
             {MILESTONES.map(milestone => {
               const earned = earnedMilestones.includes(milestone.minutes);
               return (
-                <div key={milestone.minutes} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: isMobile ? '12px 4px 10px' : '20px 8px 16px', backgroundColor: '#0a0a0a', border: `1px solid ${earned ? milestone.color + '55' : '#1a1a1a'}`, borderRadius: '12px', position: 'relative', boxShadow: earned ? `0 0 16px -4px ${milestone.color}44` : 'none', transition: 'all 0.2s' }}>
-                  <GemSVG tier={milestone} earned={earned} size={isMobile ? 36 : 52} />
-                  <span style={{ fontSize: isMobile ? '9px' : '12px', fontWeight: '600', textAlign: 'center', color: earned ? milestone.color : '#333333' }}>{milestone.name}</span>
-                  <span style={{ fontSize: isMobile ? '9px' : '11px', color: '#444444', textAlign: 'center' }}>{milestone.label}</span>
+                <div key={milestone.minutes} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: isMobile ? '12px 4px 10px' : '16px 8px 12px', backgroundColor: '#0a0a0a', border: `1px solid ${earned ? milestone.color + '55' : '#1a1a1a'}`, borderRadius: '12px', position: 'relative', boxShadow: earned ? `0 0 16px -4px ${milestone.color}44` : 'none' }}>
+                  <GemSVG tier={milestone} earned={earned} size={isMobile ? 36 : 44} />
+                  <span style={{ fontSize: isMobile ? '9px' : '11px', fontWeight: '600', textAlign: 'center', color: earned ? milestone.color : '#333333' }}>{milestone.name}</span>
+                  <span style={{ fontSize: '10px', color: '#444444', textAlign: 'center' }}>{milestone.label}</span>
                   {!earned && (
                     <div style={{ position: 'absolute', top: '7px', right: '7px', opacity: 0.5 }}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -463,8 +476,10 @@ const Profile = () => {
             </div>
           )}
 
-          {/* Download Card button */}
-          <button onClick={handleDownloadCard} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '14px 20px', backgroundColor: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '12px', color: '#ffffff', fontSize: '14px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}
+          {/* Download card button */}
+          <button
+            onClick={handleDownloadCard}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '14px 20px', backgroundColor: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '12px', color: '#ffffff', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
             onMouseEnter={e => e.currentTarget.style.borderColor = '#555'}
             onMouseLeave={e => e.currentTarget.style.borderColor = '#2a2a2a'}
           >
