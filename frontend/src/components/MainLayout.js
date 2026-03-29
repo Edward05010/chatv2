@@ -257,15 +257,15 @@ const MainLayout = () => {
           </div>
         )}
 
-        {/* Main content — overflow:hidden for chat, auto for everything else */}
+                {/* Main content — overflow:hidden for chat, auto for everything else */}
         <div style={{
           flex: 1,
           minWidth: 0,
           minHeight: 0,
           overflow: isChat ? 'hidden' : 'auto',
           background: '#000',
-          display: 'flex',
-          flexDirection: 'column',
+          height: '100%',
+          position: 'relative',
         }}>
           <Outlet />
         </div>
