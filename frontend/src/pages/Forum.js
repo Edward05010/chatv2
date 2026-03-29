@@ -73,11 +73,11 @@ const XIcon = ({ size = 13 }) => (
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const CATEGORIES = [
-  { id: "Assignments", Icon: AssignmentsIcon, desc: "Homework & classwork", short: "HW" },
-  { id: "Notes",       Icon: NotesIcon,       desc: "Study notes & summaries", short: "Notes" },
-  { id: "Doubts",      Icon: DoubtsIcon,      desc: "Questions & answers", short: "Q&A" },
-  { id: "Projects",    Icon: ProjectsIcon,    desc: "Group projects", short: "Proj" },
-  { id: "Exams",       Icon: ExamsIcon,       desc: "Exam prep & tips", short: "Exams" },
+  { id: "Assignments", Icon: AssignmentsIcon, desc: "Homework & classwork" },
+  { id: "Notes",       Icon: NotesIcon,       desc: "Study notes & summaries" },
+  { id: "Doubts",      Icon: DoubtsIcon,      desc: "Questions & answers" },
+  { id: "Projects",    Icon: ProjectsIcon,    desc: "Group projects" },
+  { id: "Exams",       Icon: ExamsIcon,       desc: "Exam prep & tips" },
 ];
 
 const INITIAL_THREADS = {
@@ -103,21 +103,21 @@ const AVATAR_COLORS = ["#5865F2","#3d8b6e","#9b6e2e","#7b4dca","#b03030","#1a7fa
 const Avatar = ({ char, size = 38 }) => {
   const bg = AVATAR_COLORS[char.charCodeAt(0) % AVATAR_COLORS.length];
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.38, fontWeight: 700, color: "#fff", flexShrink: 0, letterSpacing: "-0.5px" }}>
+    <div style={{ width: size, height: size, borderRadius: "50%", background: bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.38, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
       {char}
     </div>
   );
 };
 
 const Tag = ({ label }) => (
-  <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: "#101828", color: "#818cf8", border: "1px solid #1e2a45", letterSpacing: "0.2px", whiteSpace: "nowrap" }}>
+  <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: "#101828", color: "#818cf8", border: "1px solid #1e2a45", whiteSpace: "nowrap" }}>
     {label}
   </span>
 );
 
 const UpvoteBtn = ({ count, voted, onVote, small }) => (
   <button onClick={e => { e.stopPropagation(); onVote(); }}
-    style={{ display: "flex", alignItems: "center", gap: 5, background: voted ? "#1a1f3a" : "transparent", border: `1px solid ${voted ? "#3d4a8a" : "#1e1e1e"}`, borderRadius: 6, padding: small ? "4px 10px" : "5px 12px", color: voted ? "#818cf8" : "#444", cursor: "pointer", fontSize: small ? 12 : 13, fontWeight: 600, transition: "all 0.15s", fontFamily: "inherit" }}>
+    style={{ display: "flex", alignItems: "center", gap: 5, background: voted ? "#1a1f3a" : "transparent", border: `1px solid ${voted ? "#3d4a8a" : "#1e1e1e"}`, borderRadius: 6, padding: small ? "4px 10px" : "5px 12px", color: voted ? "#818cf8" : "#444", cursor: "pointer", fontSize: small ? 12 : 13, fontWeight: 600, fontFamily: "inherit" }}>
     <UpvoteIcon size={small ? 11 : 12} /> {count}
   </button>
 );
@@ -188,7 +188,6 @@ export default function Forum() {
   const [votedThreads, setVotedThreads]     = useState({});
   const [votedReplies, setVotedReplies]     = useState({});
   const [search, setSearch]                 = useState("");
-  const [showSearch, setShowSearch]         = useState(false);
   const [isMobile, setIsMobile]             = useState(window.innerWidth <= 768);
 
   useEffect(() => {
@@ -204,6 +203,7 @@ export default function Forum() {
   );
 
   const openThread = (thread) => { setSelectedThread(thread); setView("thread"); };
+  const goBack = () => { setView("list"); };
 
   const handlePost = () => {
     if (!newTitle.trim()) return;
@@ -238,10 +238,8 @@ export default function Forum() {
   };
 
   const switchCategory = (id) => {
-    setActiveCategory(id); setSelectedThread(null); setSearch(""); setView("list"); setShowSearch(false);
+    setActiveCategory(id); setSelectedThread(null); setSearch(""); setView("list");
   };
-
-  const goBack = () => { setView("list"); setShowSearch(false); };
 
   const pad = isMobile ? "16px" : "28px";
   const activeCat = CATEGORIES.find(c => c.id === activeCategory);
@@ -251,20 +249,20 @@ export default function Forum() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-thumb { background: #1e1e1e; border-radius: 4px; }
         .thread-row:hover { background: #111 !important; border-color: #222 !important; }
         .compose-btn:hover { background: #4048b0 !important; }
         .reply-btn:hover { background: #4048b0 !important; }
         input:focus, textarea:focus { border-color: #2a2a2a !important; outline: none; }
-        .cat-tab:hover { color: #aaa !important; }
+        .cat-pill:hover { color: #ccc !important; border-color: #333 !important; }
         .forum-fab { box-shadow: 0 4px 20px rgba(88,101,242,0.4); }
-        .forum-fab:hover { background: #4048b0 !important; transform: scale(1.05); }
+        .forum-fab:active { transform: scale(0.95); }
       `}</style>
 
-      <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#090909", fontFamily: "'DM Sans', sans-serif", color: "#c8c8c8", overflow: "hidden", position: "relative" }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#090909", fontFamily: "'DM Sans', sans-serif", color: "#c8c8c8", overflow: "hidden" }}>
 
-        {/* ── DESKTOP: Top bar with category tabs ── */}
+        {/* ── DESKTOP: Top tab bar ── */}
         {!isMobile && (
           <div style={{ borderBottom: "1px solid #141414", padding: "0 28px", display: "flex", alignItems: "center", minHeight: 56, flexShrink: 0, gap: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, overflowX: "auto" }}>
@@ -272,7 +270,7 @@ export default function Forum() {
                 const active = activeCategory === id;
                 const count = (threads[id] || []).length;
                 return (
-                  <button key={id} className="cat-tab"
+                  <button key={id} className="cat-pill"
                     onClick={() => switchCategory(id)}
                     style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 14px", borderRadius: 7, cursor: "pointer", background: active ? "#151515" : "transparent", border: `1px solid ${active ? "#222" : "transparent"}`, color: active ? "#fff" : "#444", fontSize: 13, fontWeight: active ? 600 : 400, transition: "all 0.15s", whiteSpace: "nowrap", fontFamily: "inherit", flexShrink: 0 }}>
                     <Icon size={14} />{id}
@@ -286,7 +284,7 @@ export default function Forum() {
                 <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#333", display: "flex" }}><SearchIcon /></span>
                 <input value={search} onChange={e => { setSearch(e.target.value); setView("list"); }}
                   placeholder="Search threads..."
-                  style={{ background: "#0e0e0e", border: "1px solid #181818", borderRadius: 7, padding: "7px 12px 7px 30px", color: "#c8c8c8", fontSize: 13, width: 200, fontFamily: "inherit" }} />
+                  style={{ background: "#0e0e0e", border: "1px solid #181818", borderRadius: 7, padding: "7px 12px 7px 30px", color: "#c8c8c8", fontSize: 13, width: 200, fontFamily: "inherit", outline: "none" }} />
               </div>
               <button className="compose-btn" onClick={() => { setView("compose"); setSelectedThread(null); }}
                 style={{ display: "flex", alignItems: "center", gap: 6, background: "#5865F2", border: "none", color: "#fff", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}>
@@ -296,54 +294,82 @@ export default function Forum() {
           </div>
         )}
 
-        {/* ── MOBILE: Top header ── */}
+        {/* ── MOBILE: Top header bar ── */}
         {isMobile && (
           <div style={{ borderBottom: "1px solid #141414", padding: "0 16px", display: "flex", alignItems: "center", minHeight: 52, flexShrink: 0, gap: 10 }}>
             {(view === "thread" || view === "compose") ? (
               <>
-                <button onClick={goBack} style={{ background: "none", border: "none", color: "#aaa", cursor: "pointer", padding: "4px 8px 4px 0", display: "flex", alignItems: "center" }}>
+                <button onClick={goBack} style={{ background: "none", border: "none", color: "#aaa", cursor: "pointer", padding: "4px 8px 4px 0", display: "flex" }}>
                   <BackIcon size={20} />
                 </button>
-                <span style={{ fontSize: 16, fontWeight: 700, color: "#e8e8e8", flex: 1 }}>
-                  {view === "compose" ? "New Post" : selectedThread?.title?.length > 30 ? selectedThread?.title?.substring(0, 30) + "…" : selectedThread?.title}
+                <span style={{ fontSize: 16, fontWeight: 700, color: "#e8e8e8", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {view === "compose" ? "New Post" : selectedThread?.title?.length > 28 ? selectedThread?.title?.substring(0, 28) + "…" : selectedThread?.title}
                 </span>
-              </>
-            ) : showSearch ? (
-              <>
-                <button onClick={() => { setShowSearch(false); setSearch(""); }} style={{ background: "none", border: "none", color: "#aaa", cursor: "pointer", padding: "4px 8px 4px 0", display: "flex" }}>
-                  <BackIcon size={20} />
-                </button>
-                <input value={search} onChange={e => setSearch(e.target.value)} autoFocus
-                  placeholder="Search threads..."
-                  style={{ flex: 1, background: "#0e0e0e", border: "1px solid #181818", borderRadius: 8, padding: "8px 14px", color: "#c8c8c8", fontSize: 14, fontFamily: "inherit", outline: "none" }} />
               </>
             ) : (
               <>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                  {activeCat && <activeCat.Icon size={18} />}
-                  <span style={{ fontSize: 17, fontWeight: 700, color: "#e8e8e8" }}>{activeCategory}</span>
-                  <span style={{ fontSize: 12, color: "#444", background: "#141414", padding: "2px 7px", borderRadius: 5, fontWeight: 600 }}>
-                    {(threads[activeCategory] || []).length}
-                  </span>
-                </div>
-                <button onClick={() => setShowSearch(true)} style={{ background: "none", border: "none", color: "#555", cursor: "pointer", padding: 6, display: "flex" }}>
-                  <SearchIcon size={18} />
+                <span style={{ fontSize: 17, fontWeight: 700, color: "#e8e8e8", flex: 1 }}>Forum</span>
+                <button onClick={() => { setView("compose"); setSelectedThread(null); }}
+                  style={{ display: "flex", alignItems: "center", gap: 5, background: "#5865F2", border: "none", color: "#fff", borderRadius: 8, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                  <PlusIcon size={12} /> New Post
                 </button>
               </>
             )}
           </div>
         )}
 
+        {/* ── MOBILE: Horizontal scrollable category pills (only on list view) ── */}
+        {isMobile && view === "list" && (
+          <div style={{ borderBottom: "1px solid #141414", padding: "10px 16px", display: "flex", gap: 8, overflowX: "auto", flexShrink: 0, WebkitOverflowScrolling: "touch" }}>
+            {CATEGORIES.map(({ id, Icon }) => {
+              const active = activeCategory === id;
+              const count = (threads[id] || []).length;
+              return (
+                <button key={id}
+                  onClick={() => switchCategory(id)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, cursor: "pointer", background: active ? "#5865F2" : "#111", border: `1px solid ${active ? "#5865F2" : "#222"}`, color: active ? "#fff" : "#555", fontSize: 13, fontWeight: active ? 700 : 500, whiteSpace: "nowrap", fontFamily: "inherit", flexShrink: 0, transition: "all 0.15s" }}>
+                  <Icon size={13} />
+                  {id}
+                  {count > 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 700, background: active ? "rgba(255,255,255,0.2)" : "#1a1a1a", color: active ? "#fff" : "#444", padding: "1px 6px", borderRadius: 10, marginLeft: 2 }}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── MOBILE: Search bar (only on list view) ── */}
+        {isMobile && view === "list" && (
+          <div style={{ padding: "10px 16px", borderBottom: "1px solid #0e0e0e", flexShrink: 0 }}>
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#333", display: "flex" }}><SearchIcon size={15} /></span>
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search threads..."
+                style={{ width: "100%", background: "#0e0e0e", border: "1px solid #181818", borderRadius: 10, padding: "9px 14px 9px 34px", color: "#c8c8c8", fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+            </div>
+          </div>
+        )}
+
         {/* ── Body ── */}
-        <div style={{ flex: 1, overflow: "hidden", display: "flex", paddingBottom: isMobile ? 64 : 0 }}>
+        <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
 
           {/* LIST VIEW */}
           {view === "list" && (
-            <div style={{ flex: 1, overflowY: "auto", padding: `20px ${pad}` }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: `16px ${pad}` }}>
               {!isMobile && (
                 <div style={{ marginBottom: 20 }}>
                   <h2 style={{ fontSize: 22, fontWeight: 700, color: "#e8e8e8", margin: 0, marginBottom: 4 }}>{activeCategory}</h2>
                   <p style={{ fontSize: 13, color: "#333", margin: 0 }}>{activeCat?.desc}</p>
+                </div>
+              )}
+
+              {isMobile && (
+                <div style={{ marginBottom: 14 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 700, color: "#e8e8e8", margin: 0, marginBottom: 2 }}>{activeCategory}</h2>
+                  <p style={{ fontSize: 12, color: "#333", margin: 0 }}>{activeCat?.desc}</p>
                 </div>
               )}
 
@@ -352,12 +378,6 @@ export default function Forum() {
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1e1e1e" strokeWidth="1.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                   <div style={{ fontSize: 15, fontWeight: 600, color: "#222" }}>No threads yet</div>
                   <div style={{ fontSize: 13, color: "#1a1a1a" }}>Be the first to start a discussion</div>
-                  {!isMobile && (
-                    <button className="compose-btn" onClick={() => setView("compose")}
-                      style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, background: "#5865F2", border: "none", color: "#fff", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                      <PlusIcon /> New Post
-                    </button>
-                  )}
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 8 : 10 }}>
@@ -369,19 +389,14 @@ export default function Forum() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 5 }}>
                           <div style={{ fontSize: isMobile ? 14 : 15, fontWeight: 600, color: "#e0e0e0", lineHeight: 1.4 }}>{thread.title}</div>
-                          {thread.tag && !isMobile && <Tag label={thread.tag} />}
+                          {thread.tag && <Tag label={thread.tag} />}
                         </div>
-                        {thread.body && !isMobile && (
-                          <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6, marginBottom: 10, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        {thread.body && (
+                          <div style={{ fontSize: isMobile ? 12 : 13, color: "#555", lineHeight: 1.6, marginBottom: 8, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: isMobile ? 1 : 2, WebkitBoxOrient: "vertical" }}>
                             {thread.body}
                           </div>
                         )}
-                        {thread.body && isMobile && (
-                          <div style={{ fontSize: 12, color: "#444", lineHeight: 1.5, marginBottom: 8, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" }}>
-                            {thread.body}
-                          </div>
-                        )}
-                        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 16, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                           <span style={{ fontSize: 12, color: "#333", fontWeight: 500 }}>{thread.author}</span>
                           <span style={{ fontSize: 12, color: "#252525" }}>·</span>
                           <span style={{ fontSize: 12, color: "#333" }}>{thread.time}</span>
@@ -391,7 +406,6 @@ export default function Forum() {
                           <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#333" }}>
                             <UpvoteIcon size={11} /> {thread.upvotes}
                           </span>
-                          {thread.tag && isMobile && <Tag label={thread.tag} />}
                         </div>
                       </div>
                     </div>
@@ -403,7 +417,7 @@ export default function Forum() {
 
           {/* THREAD DETAIL VIEW */}
           {view === "thread" && selectedThread && (
-            <div style={{ flex: 1, overflowY: "auto", padding: `20px ${pad}` }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: `16px ${pad}` }}>
               <div style={{ maxWidth: 760, margin: "0 auto" }}>
                 {!isMobile && (
                   <button onClick={goBack}
@@ -414,7 +428,7 @@ export default function Forum() {
 
                 <div style={{ marginBottom: 20 }}>
                   {selectedThread.tag && <div style={{ marginBottom: 10 }}><Tag label={selectedThread.tag} /></div>}
-                  <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: "#eee", lineHeight: 1.4, margin: "0 0 14px 0" }}>{selectedThread.title}</h1>
+                  <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: "#eee", lineHeight: 1.4, margin: "0 0 14px" }}>{selectedThread.title}</h1>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
                     <Avatar char={selectedThread.avatar} size={34} />
                     <div>
@@ -464,7 +478,7 @@ export default function Forum() {
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#2a2a2a", letterSpacing: 1.3, textTransform: "uppercase", marginBottom: 12 }}>Write a Reply</div>
                   <textarea value={newReply} onChange={e => setNewReply(e.target.value)} placeholder="Share your thoughts..."
                     rows={isMobile ? 3 : 4}
-                    style={{ width: "100%", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px 14px", color: "#d0d0d0", fontSize: 14, fontFamily: "inherit", resize: "none", lineHeight: 1.65, marginBottom: 10, display: "block" }} />
+                    style={{ width: "100%", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px 14px", color: "#d0d0d0", fontSize: 14, fontFamily: "inherit", resize: "none", lineHeight: 1.65, marginBottom: 10, display: "block", outline: "none", boxSizing: "border-box" }} />
                   {newReplyFiles.length > 0 && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                       {newReplyFiles.map((f, i) => <FileChip key={i} file={f} onRemove={() => setNewReplyFiles(p => p.filter((_, idx) => idx !== i))} />)}
@@ -474,7 +488,7 @@ export default function Forum() {
                     <AttachButton onFiles={files => setNewReplyFiles(p => [...p, ...files])} />
                     <button className="reply-btn" onClick={handleReply}
                       disabled={!newReply.trim() && newReplyFiles.length === 0}
-                      style={{ background: (newReply.trim() || newReplyFiles.length > 0) ? "#5865F2" : "#141414", border: "none", color: (newReply.trim() || newReplyFiles.length > 0) ? "#fff" : "#2a2a2a", borderRadius: 8, padding: isMobile ? "8px 18px" : "9px 22px", fontSize: 13, fontWeight: 600, cursor: (newReply.trim() || newReplyFiles.length > 0) ? "pointer" : "default", fontFamily: "inherit" }}>
+                      style={{ background: (newReply.trim() || newReplyFiles.length > 0) ? "#5865F2" : "#141414", border: "none", color: (newReply.trim() || newReplyFiles.length > 0) ? "#fff" : "#2a2a2a", borderRadius: 8, padding: "9px 22px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                       Post Reply
                     </button>
                   </div>
@@ -485,7 +499,7 @@ export default function Forum() {
 
           {/* COMPOSE VIEW */}
           {view === "compose" && (
-            <div style={{ flex: 1, overflowY: "auto", padding: `20px ${pad}` }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: `16px ${pad}` }}>
               <div style={{ maxWidth: 720, margin: "0 auto" }}>
                 {!isMobile && (
                   <button onClick={goBack}
@@ -493,19 +507,35 @@ export default function Forum() {
                     <BackIcon /> Cancel
                   </button>
                 )}
+
                 <div style={{ marginBottom: isMobile ? 20 : 28 }}>
                   <h2 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 700, color: "#e8e8e8", margin: "0 0 4px" }}>Create a Post</h2>
                   <p style={{ fontSize: 13, color: "#333", margin: 0 }}>Posting in <span style={{ color: "#818cf8" }}>{activeCategory}</span></p>
                 </div>
 
+                {/* Category selector in compose view on mobile */}
+                {isMobile && (
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "#333", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 8 }}>Category</label>
+                    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" }}>
+                      {CATEGORIES.map(({ id }) => (
+                        <button key={id} onClick={() => setActiveCategory(id)}
+                          style={{ padding: "6px 14px", borderRadius: 20, cursor: "pointer", background: activeCategory === id ? "#5865F2" : "#111", border: `1px solid ${activeCategory === id ? "#5865F2" : "#222"}`, color: activeCategory === id ? "#fff" : "#555", fontSize: 13, fontWeight: activeCategory === id ? 700 : 500, whiteSpace: "nowrap", fontFamily: "inherit", flexShrink: 0 }}>
+                          {id}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <label style={{ fontSize: 11, fontWeight: 700, color: "#333", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 8 }}>Title *</label>
                 <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Give your post a clear, descriptive title..."
-                  style={{ width: "100%", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 9, padding: "13px 16px", color: "#e0e0e0", fontSize: isMobile ? 14 : 15, fontWeight: 500, fontFamily: "inherit", marginBottom: 20, display: "block" }} />
+                  style={{ width: "100%", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 9, padding: "13px 16px", color: "#e0e0e0", fontSize: isMobile ? 14 : 15, fontWeight: 500, fontFamily: "inherit", marginBottom: 20, display: "block", outline: "none", boxSizing: "border-box" }} />
 
                 <label style={{ fontSize: 11, fontWeight: 700, color: "#333", letterSpacing: 1, textTransform: "uppercase", display: "block", marginBottom: 8 }}>Body</label>
                 <textarea value={newBody} onChange={e => setNewBody(e.target.value)} placeholder="Share context, details, or ask your question in full..."
                   rows={isMobile ? 5 : 7}
-                  style={{ width: "100%", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 9, padding: "13px 16px", color: "#d0d0d0", fontSize: 14, fontFamily: "inherit", resize: "vertical", lineHeight: 1.7, marginBottom: 16, display: "block" }} />
+                  style={{ width: "100%", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 9, padding: "13px 16px", color: "#d0d0d0", fontSize: 14, fontFamily: "inherit", resize: "vertical", lineHeight: 1.7, marginBottom: 16, display: "block", outline: "none", boxSizing: "border-box" }} />
 
                 {newPostFiles.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
@@ -532,39 +562,6 @@ export default function Forum() {
             </div>
           )}
         </div>
-
-        {/* ── MOBILE: Bottom tab bar ── */}
-        {isMobile && (
-          <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#0a0a0a", borderTop: "1px solid #141414", display: "flex", alignItems: "stretch", zIndex: 100, height: 64 }}>
-            {CATEGORIES.map(({ id, Icon }) => {
-              const active = activeCategory === id;
-              const count = (threads[id] || []).length;
-              return (
-                <button key={id} className="cat-tab"
-                  onClick={() => switchCategory(id)}
-                  style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: active ? "#818cf8" : "#333", fontFamily: "inherit", padding: "8px 4px", position: "relative", transition: "color 0.15s" }}>
-                  {active && <div style={{ position: "absolute", top: 0, left: "20%", right: "20%", height: 2, background: "#818cf8", borderRadius: "0 0 2px 2px" }} />}
-                  <Icon size={20} />
-                  <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, letterSpacing: "0.2px" }}>{id.length > 6 ? id.substring(0, 5) + "…" : id}</span>
-                  {count > 0 && (
-                    <div style={{ position: "absolute", top: 8, right: "18%", width: 14, height: 14, background: active ? "#818cf8" : "#222", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ fontSize: 8, fontWeight: 700, color: active ? "#fff" : "#555" }}>{count > 9 ? "9+" : count}</span>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── MOBILE: Floating action button for new post ── */}
-        {isMobile && view === "list" && (
-          <button className="forum-fab"
-            onClick={() => { setView("compose"); setSelectedThread(null); }}
-            style={{ position: "fixed", bottom: 76, right: 20, width: 52, height: 52, borderRadius: "50%", background: "#5865F2", border: "none", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 101, transition: "all 0.2s" }}>
-            <PlusIcon size={22} />
-          </button>
-        )}
       </div>
     </>
   );
